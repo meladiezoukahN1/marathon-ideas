@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { AppShell } from "@/components/layout/app-shell";
 
 export default function Home() {
@@ -17,6 +19,33 @@ export default function Home() {
           <div className="mt-8 rounded-xl border border-dashed border-border bg-muted/60 px-6 py-4 text-sm font-medium text-foreground">
             النظام قيد التجهيز
           </div>
+
+          <nav className="mt-6 grid gap-3 sm:grid-cols-2" aria-label="روابط الصفحات">
+            <Link
+              href="/display"
+              className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+            >
+              شاشة العرض
+            </Link>
+            <Link
+              href="/vote"
+              className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+            >
+              التصويت العام
+            </Link>
+            <Link
+              href="/jury"
+              className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+            >
+              تصويت لجنة التحكيم
+            </Link>
+            <Link
+              href="/admin"
+              className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+            >
+              لوحة التحكم
+            </Link>
+          </nav>
         </section>
       </main>
     </AppShell>
