@@ -60,7 +60,7 @@ The AI must not:
 - hardcode colors
 - skip server-side validation
 - skip authorization policy checks
-- skip audit logs for mutations
+- skip required traceability for mutations
 - add dependencies without explicit approval
 - create empty folders without need
 - implement unrelated features
@@ -80,7 +80,7 @@ For any task:
 6. Reuse shared components.
 7. Enforce validation.
 8. Enforce authorization where needed.
-9. Add audit logs for mutations.
+9. Enforce mutation traceability per contract.
 10. Run typecheck when possible.
 11. Report files changed and remaining issues.
 
@@ -144,7 +144,12 @@ If the task touches authentication or authorization:
 
 If the task includes a mutation:
 
-- create audit log
+- create AuditLog for administrative/control mutations
+- voting submissions use designated domain vote tables as their audit trail
+- PublicVote/JuryVote are exempt from per-vote AuditLog in this version
+- every mutation must be traceable by one of:
+  - AuditLog for admin/control mutations
+  - designated domain persistence table for high-volume vote submissions
 - use transaction when mutation has multiple writes
 - do not mutate data silently
 

@@ -130,7 +130,7 @@ Forbidden:
 Example:
 
 ```tsx
-import { RegisterForm } from '@/features/auth/register/components/register-form';
+import { RegisterForm } from "@/features/auth/register/components/register-form";
 
 export default function RegisterPage() {
   return <RegisterForm />;
@@ -325,7 +325,19 @@ Middleware is not enough for sensitive operations.
 
 ## Audit Rule
 
-Every mutation must create an audit log.
+Administrative/control mutations must create AuditLog.
+
+High-volume public/jury vote submissions are traceable through designated domain tables:
+
+- PublicVote
+- JuryVote
+
+PublicVote/JuryVote are exempt from per-vote AuditLog in this version.
+
+Every mutation must be traceable either through:
+
+- AuditLog for admin/control operations
+- designated domain persistence tables for high-volume vote submissions
 
 Mutation examples:
 

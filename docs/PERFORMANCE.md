@@ -193,6 +193,19 @@ Use server validation regardless of client validation.
 
 ---
 
+## High-Volume Vote Path
+
+Public vote submission is a high-throughput path.
+
+Rules:
+
+- do not add duplicate writes
+- do not add per-vote AuditLog writes for PublicVote/JuryVote
+- keep vote write path minimal and indexed
+- this is a deliberate throughput safeguard, not a missing audit
+
+---
+
 ## Rejection Rules
 
 Reject implementation if:

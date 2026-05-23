@@ -361,6 +361,24 @@ If final scores are equal:
 - tie-break action must be audit logged.
 - display must show “تعادل — بانتظار قرار لجنة التحكيم” until resolved.
 
+## 6.7 Voting Audit Exception
+
+Voting persistence is traceable by designated domain tables.
+
+- PublicVote rows are the official audit trail for public voting.
+- JuryVote rows are the official audit trail for jury voting.
+- Do not write AuditLog for public vote submissions.
+- Do not write AuditLog for jury vote submissions in this version.
+
+AuditLog is required for administrative/control mutations only:
+
+- display mode changes
+- match phase changes
+- timer actions
+- voting open/close
+- result calculation/show
+- tie resolution
+
 ---
 
 # 7. ANTI-DUPLICATE PUBLIC VOTING
@@ -770,7 +788,7 @@ Use a long-running Node host, VPS, Railway/Fly/Render, or replace realtime with 
 - Route handlers validate input and call services.
 - Services orchestrate business logic.
 - Repositories are the only layer that calls Prisma.
-- All mutations must create audit logs.
+- All mutations must be traceable: AuditLog for administrative/control mutations, and designated domain vote tables (PublicVote/JuryVote) for high-volume voting submissions.
 - All API inputs must use Zod.
 - Use Prisma `select`.
 - No raw IP storage.
