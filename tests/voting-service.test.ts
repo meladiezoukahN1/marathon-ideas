@@ -53,6 +53,16 @@ describe("voting service", () => {
       phase: "CLOSED",
       team1Id: "t1",
       team2Id: "t2",
+      team1: {
+        id: "t1",
+        nameAr: "فريق ألف",
+        ideaAr: "فكرة ألف",
+      },
+      team2: {
+        id: "t2",
+        nameAr: "فريق باء",
+        ideaAr: "فكرة باء",
+      },
     });
 
     await expect(getCurrentPublicVotingState({})).resolves.toEqual({
@@ -61,6 +71,16 @@ describe("voting service", () => {
         phase: "CLOSED",
         team1Id: "t1",
         team2Id: "t2",
+        team1: {
+          id: "t1",
+          nameAr: "فريق ألف",
+          ideaAr: "فكرة ألف",
+        },
+        team2: {
+          id: "t2",
+          nameAr: "فريق باء",
+          ideaAr: "فكرة باء",
+        },
       },
       votingOpen: false,
     });
@@ -72,6 +92,16 @@ describe("voting service", () => {
       phase: "VOTING",
       team1Id: "t1",
       team2Id: "t2",
+      team1: {
+        id: "t1",
+        nameAr: "فريق ألف",
+        ideaAr: "فكرة ألف",
+      },
+      team2: {
+        id: "t2",
+        nameAr: "فريق باء",
+        ideaAr: "فكرة باء",
+      },
     });
 
     await expect(getCurrentPublicVotingState({})).resolves.toEqual({
@@ -80,6 +110,16 @@ describe("voting service", () => {
         phase: "VOTING",
         team1Id: "t1",
         team2Id: "t2",
+        team1: {
+          id: "t1",
+          nameAr: "فريق ألف",
+          ideaAr: "فكرة ألف",
+        },
+        team2: {
+          id: "t2",
+          nameAr: "فريق باء",
+          ideaAr: "فكرة باء",
+        },
       },
       votingOpen: true,
     });
@@ -93,6 +133,16 @@ describe("voting service", () => {
       phase: "VOTING",
       team1Id: "t1",
       team2Id: "t2",
+      team1: {
+        id: "t1",
+        nameAr: "فريق ألف",
+        ideaAr: "فكرة ألف",
+      },
+      team2: {
+        id: "t2",
+        nameAr: "فريق باء",
+        ideaAr: "فكرة باء",
+      },
     });
     mockedHasJuryVote.mockResolvedValue(false);
 
@@ -102,6 +152,16 @@ describe("voting service", () => {
         phase: "VOTING",
         team1Id: "t1",
         team2Id: "t2",
+        team1: {
+          id: "t1",
+          nameAr: "فريق ألف",
+          ideaAr: "فكرة ألف",
+        },
+        team2: {
+          id: "t2",
+          nameAr: "فريق باء",
+          ideaAr: "فكرة باء",
+        },
       },
       votingOpen: true,
       hasVoted: false,
@@ -116,6 +176,16 @@ describe("voting service", () => {
       phase: "VOTING",
       team1Id: "t1",
       team2Id: "t2",
+      team1: {
+        id: "t1",
+        nameAr: "فريق ألف",
+        ideaAr: "فكرة ألف",
+      },
+      team2: {
+        id: "t2",
+        nameAr: "فريق باء",
+        ideaAr: "فكرة باء",
+      },
     });
     mockedHasJuryVote.mockResolvedValue(true);
 
@@ -125,6 +195,16 @@ describe("voting service", () => {
         phase: "VOTING",
         team1Id: "t1",
         team2Id: "t2",
+        team1: {
+          id: "t1",
+          nameAr: "فريق ألف",
+          ideaAr: "فكرة ألف",
+        },
+        team2: {
+          id: "t2",
+          nameAr: "فريق باء",
+          ideaAr: "فكرة باء",
+        },
       },
       votingOpen: true,
       hasVoted: true,
@@ -145,6 +225,16 @@ describe("voting service", () => {
       phase: "CLOSED",
       team1Id: "t1",
       team2Id: "t2",
+      team1: {
+        id: "t1",
+        nameAr: "فريق ألف",
+        ideaAr: "فكرة ألف",
+      },
+      team2: {
+        id: "t2",
+        nameAr: "فريق باء",
+        ideaAr: "فكرة باء",
+      },
     });
 
     await expect(
@@ -161,6 +251,16 @@ describe("voting service", () => {
       phase: "VOTING",
       team1Id: "t1",
       team2Id: "t2",
+      team1: {
+        id: "t1",
+        nameAr: "فريق ألف",
+        ideaAr: "فكرة ألف",
+      },
+      team2: {
+        id: "t2",
+        nameAr: "فريق باء",
+        ideaAr: "فكرة باء",
+      },
     });
 
     await expect(
@@ -177,6 +277,16 @@ describe("voting service", () => {
       phase: "VOTING",
       team1Id: "t1",
       team2Id: "t2",
+      team1: {
+        id: "t1",
+        nameAr: "فريق ألف",
+        ideaAr: "فكرة ألف",
+      },
+      team2: {
+        id: "t2",
+        nameAr: "فريق باء",
+        ideaAr: "فكرة باء",
+      },
     });
     mockedCheckPublicVoteDuplicate.mockResolvedValue({
       isDuplicate: true,
@@ -199,6 +309,16 @@ describe("voting service", () => {
       phase: "VOTING",
       team1Id: "t1",
       team2Id: "t2",
+      team1: {
+        id: "t1",
+        nameAr: "فريق ألف",
+        ideaAr: "فكرة ألف",
+      },
+      team2: {
+        id: "t2",
+        nameAr: "فريق باء",
+        ideaAr: "فكرة باء",
+      },
     });
     mockedCheckPublicVoteDuplicate.mockResolvedValue({
       isDuplicate: true,
@@ -231,6 +351,16 @@ describe("voting service", () => {
       phase: "VOTING",
       team1Id: "t1",
       team2Id: "t2",
+      team1: {
+        id: "t1",
+        nameAr: "فريق ألف",
+        ideaAr: "فكرة ألف",
+      },
+      team2: {
+        id: "t2",
+        nameAr: "فريق باء",
+        ideaAr: "فكرة باء",
+      },
     });
     mockedHasJuryVote.mockResolvedValue(true);
 

@@ -129,8 +129,33 @@ describe("api route contracts", () => {
     hashIpMock.mockReturnValue("hashed-ip");
 
     getEventStateMock.mockResolvedValue({ displayMode: "EVENT_WAITING" } as never);
-    getCurrentPublicVotingStateMock.mockResolvedValue({ votingOpen: true } as never);
-    getCurrentJuryVotingStateMock.mockResolvedValue({ votingOpen: true, hasVoted: false } as never);
+    getCurrentPublicVotingStateMock.mockResolvedValue(
+      {
+        votingOpen: true,
+        currentMatch: {
+          id: "m1",
+          phase: "VOTING",
+          team1Id: "t1",
+          team2Id: "t2",
+          team1: { id: "t1", nameAr: "فريق ألف", ideaAr: "فكرة ألف" },
+          team2: { id: "t2", nameAr: "فريق باء", ideaAr: "فكرة باء" },
+        },
+      } as never,
+    );
+    getCurrentJuryVotingStateMock.mockResolvedValue(
+      {
+        votingOpen: true,
+        hasVoted: false,
+        currentMatch: {
+          id: "m1",
+          phase: "VOTING",
+          team1Id: "t1",
+          team2Id: "t2",
+          team1: { id: "t1", nameAr: "فريق ألف", ideaAr: "فكرة ألف" },
+          team2: { id: "t2", nameAr: "فريق باء", ideaAr: "فكرة باء" },
+        },
+      } as never,
+    );
     submitPublicVoteMock.mockResolvedValue({ success: true } as never);
     submitJuryVoteMock.mockResolvedValue({ success: true } as never);
 
@@ -161,7 +186,20 @@ describe("api route contracts", () => {
 
     expect(getCurrentUserMock).not.toHaveBeenCalled();
     expect(getCurrentPublicVotingStateMock).toHaveBeenCalledWith({});
-    expect(payload).toEqual({ data: { votingOpen: true }, error: null });
+    expect(payload).toEqual({
+      data: {
+        votingOpen: true,
+        currentMatch: {
+          id: "m1",
+          phase: "VOTING",
+          team1Id: "t1",
+          team2Id: "t2",
+          team1: { id: "t1", nameAr: "فريق ألف", ideaAr: "فكرة ألف" },
+          team2: { id: "t2", nameAr: "فريق باء", ideaAr: "فكرة باء" },
+        },
+      },
+      error: null,
+    });
   });
 
   it("POST /vote/public is public and delegates to submitPublicVote", async () => {
@@ -206,7 +244,21 @@ describe("api route contracts", () => {
 
     expect(getCurrentUserMock).toHaveBeenCalledWith(true);
     expect(getCurrentJuryVotingStateMock).toHaveBeenCalledWith({}, { actor });
-    expect(payload).toEqual({ data: { votingOpen: true, hasVoted: false }, error: null });
+    expect(payload).toEqual({
+      data: {
+        votingOpen: true,
+        hasVoted: false,
+        currentMatch: {
+          id: "m1",
+          phase: "VOTING",
+          team1Id: "t1",
+          team2Id: "t2",
+          team1: { id: "t1", nameAr: "فريق ألف", ideaAr: "فكرة ألف" },
+          team2: { id: "t2", nameAr: "فريق باء", ideaAr: "فكرة باء" },
+        },
+      },
+      error: null,
+    });
   });
 
   it("POST /vote/jury requires auth and delegates to submitJuryVote", async () => {

@@ -12,6 +12,20 @@ const votingMatchSelect = {
   phase: true,
   team1Id: true,
   team2Id: true,
+  team1: {
+    select: {
+      id: true,
+      nameAr: true,
+      ideaAr: true,
+    },
+  },
+  team2: {
+    select: {
+      id: true,
+      nameAr: true,
+      ideaAr: true,
+    },
+  },
 } as const;
 
 function mapVotingMatchSnapshot(row: {
@@ -28,12 +42,32 @@ function mapVotingMatchSnapshot(row: {
     | "RESULT";
   team1Id: string;
   team2Id: string;
+  team1: {
+    id: string;
+    nameAr: string;
+    ideaAr: string;
+  };
+  team2: {
+    id: string;
+    nameAr: string;
+    ideaAr: string;
+  };
 }): VotingMatchSnapshot {
   return {
     id: row.id,
     phase: row.phase,
     team1Id: row.team1Id,
     team2Id: row.team2Id,
+    team1: {
+      id: row.team1.id,
+      nameAr: row.team1.nameAr,
+      ideaAr: row.team1.ideaAr,
+    },
+    team2: {
+      id: row.team2.id,
+      nameAr: row.team2.nameAr,
+      ideaAr: row.team2.ideaAr,
+    },
   };
 }
 
@@ -53,12 +87,7 @@ export async function getCurrentVotingMatchFromEventControl(): Promise<VotingMat
     return null;
   }
 
-  return {
-    id: current.id,
-    phase: current.phase,
-    team1Id: current.team1Id,
-    team2Id: current.team2Id,
-  };
+  return getVotingMatchById(current.id);
 }
 
 export async function checkPublicVoteDuplicate(

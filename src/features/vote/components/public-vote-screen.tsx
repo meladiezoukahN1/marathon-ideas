@@ -131,16 +131,18 @@ export function PublicVoteScreen() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <VoteTeamCard
-          title="الفريق الأول"
-          teamId={currentMatch.team1Id}
-          selected={selectedTeamId === currentMatch.team1Id}
+          teamName={currentMatch.team1.nameAr}
+          teamIdea={currentMatch.team1.ideaAr}
+          teamId={currentMatch.team1.id}
+          selected={selectedTeamId === currentMatch.team1.id}
           disabled={submitting}
           onSelect={setSelectedTeamId}
         />
         <VoteTeamCard
-          title="الفريق الثاني"
-          teamId={currentMatch.team2Id}
-          selected={selectedTeamId === currentMatch.team2Id}
+          teamName={currentMatch.team2.nameAr}
+          teamIdea={currentMatch.team2.ideaAr}
+          teamId={currentMatch.team2.id}
+          selected={selectedTeamId === currentMatch.team2.id}
           disabled={submitting}
           onSelect={setSelectedTeamId}
         />

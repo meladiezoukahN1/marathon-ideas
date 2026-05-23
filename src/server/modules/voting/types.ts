@@ -11,11 +11,19 @@ export type MatchPhaseValue =
   | "BRACKET_UPDATE"
   | "RESULT";
 
+export interface VotingTeamSnapshot {
+  id: string;
+  nameAr: string;
+  ideaAr: string;
+}
+
 export interface VotingMatchSnapshot {
   id: string;
   phase: MatchPhaseValue;
   team1Id: string;
   team2Id: string;
+  team1: VotingTeamSnapshot;
+  team2: VotingTeamSnapshot;
 }
 
 export interface CurrentPublicVotingState {

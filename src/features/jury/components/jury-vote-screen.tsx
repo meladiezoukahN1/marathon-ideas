@@ -110,16 +110,18 @@ export function JuryVoteScreen() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <JuryTeamCard
-          label="الفريق 1"
-          teamId={currentMatch.team1Id}
-          selected={selectedTeamId === currentMatch.team1Id}
+          teamName={currentMatch.team1.nameAr}
+          teamIdea={currentMatch.team1.ideaAr}
+          teamId={currentMatch.team1.id}
+          selected={selectedTeamId === currentMatch.team1.id}
           disabled={submitting}
           onSelect={setSelectedTeamId}
         />
         <JuryTeamCard
-          label="الفريق 2"
-          teamId={currentMatch.team2Id}
-          selected={selectedTeamId === currentMatch.team2Id}
+          teamName={currentMatch.team2.nameAr}
+          teamIdea={currentMatch.team2.ideaAr}
+          teamId={currentMatch.team2.id}
+          selected={selectedTeamId === currentMatch.team2.id}
           disabled={submitting}
           onSelect={setSelectedTeamId}
         />
