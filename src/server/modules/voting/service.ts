@@ -1,135 +1,113 @@
-import { ConflictError, NotFoundError } from "../../core/errors";
+import { prisma } from "@/lib/prisma"
+import crypto from "crypto"
 
-import {
-  checkPublicVoteDuplicate,
-  getCurrentVotingMatchFromEventControl,
-  getVotingMatchById,
-  hasJuryVote,
-  insertJuryVote,
-  insertPublicVote,
-} from "./repository";
-import {
-  assertActorIsJury,
-  assertMatchPhaseIsVoting,
-  assertTeamBelongsToMatch,
-} from "./policy";
-import type {
-  CurrentJuryVotingState,
-  CurrentPublicVotingState,
-  JuryVoteCommand,
-  VoteServiceSuccess,
-} from "./types";
-import {
-  validateGetCurrentJuryVotingStateInput,
-  validateGetCurrentPublicVotingStateInput,
-  validateJuryVoteInput,
-  validatePublicVoteInput,
-} from "./validator";
-
-export async function getCurrentPublicVotingState(
-  input: unknown,
-): Promise<CurrentPublicVotingState> {
-  validateGetCurrentPublicVotingStateInput(input);
-
-  const currentMatch = await getCurrentVotingMatchFromEventControl();
-
-  return {
-    currentMatch,
-    votingOpen: Boolean(currentMatch && currentMatch.phase === "VOTING"),
-  };
+function hashFingerprint(fp: string, challengeId: string): string {
+  return crypto.createHash("sha256").update(`${fp}:${challengeId}:vote-salt`).digest("hex")
 }
 
-export async function getCurrentJuryVotingState(
-  input: unknown,
-  command: { actor: unknown },
-): Promise<CurrentJuryVotingState> {
-  validateGetCurrentJuryVotingStateInput(input);
-
-  assertActorIsJury(command.actor as never);
-
-  const currentMatch = await getCurrentVotingMatchFromEventControl();
-
-  if (!currentMatch) {
-    return {
-      currentMatch: null,
-      votingOpen: false,
-      hasVoted: false,
-    };
-  }
-
-  const actor = command.actor as { id: string };
-  const hasAlreadyVoted = await hasJuryVote(currentMatch.id, actor.id);
-
-  return {
-    currentMatch,
-    votingOpen: currentMatch.phase === "VOTING",
-    hasVoted: hasAlreadyVoted,
-  };
+function isVotingClosed(votingEndsAt: Date | null): boolean {
+  if (!votingEndsAt) return true
+  return Date.now() >= votingEndsAt.getTime()
 }
 
 export async function submitPublicVote(
-  input: unknown,
-  command: { hashedIp: string },
-): Promise<VoteServiceSuccess> {
-  const validated = validatePublicVoteInput(input);
-
-  const match = await getVotingMatchById(validated.matchId);
-
-  if (!match) {
-    throw new NotFoundError(`Match not found: ${validated.matchId}`);
+  challengeId: string,
+  teamId: string,
+  voterToken: string,
+) {
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: challengeId },
+    select: { phase: true, votingEndsAt: true, votingSessionId: true },
+  })
+  if (!challenge || challenge.phase !== "VOTING") {
+    throw new Error("VOTING_NOT_OPEN")
+  }
+  if (isVotingClosed(challenge.votingEndsAt)) {
+    throw new Error("VOTING_CLOSED")
+  }
+  if (!challenge.votingSessionId) {
+    throw new Error("VOTING_NOT_OPEN")
   }
 
-  assertMatchPhaseIsVoting(match.phase);
-  assertTeamBelongsToMatch(validated.teamId, match);
-
-  const duplicate = await checkPublicVoteDuplicate(
-    validated.matchId,
-    command.hashedIp,
-    validated.fingerprintHash,
-  );
-
-  if (duplicate.isDuplicate) {
-    throw new ConflictError(`Duplicate public vote detected by ${duplicate.reason}`);
+  const team = await prisma.team.findFirst({
+    where: { id: teamId, challengeId },
+    select: { id: true },
+  })
+  if (!team) {
+    throw new Error("INVALID_TEAM")
   }
 
-  await insertPublicVote({
-    matchId: validated.matchId,
-    teamId: validated.teamId,
-    hashedIp: command.hashedIp,
-    fingerprintHash: validated.fingerprintHash,
-  });
+  const hashedFp = hashFingerprint(voterToken, challengeId)
 
-  return { success: true };
+  const existing = await prisma.publicVote.findUnique({
+    where: {
+      challengeId_votingSessionId_voterToken: {
+        challengeId,
+        votingSessionId: challenge.votingSessionId,
+        voterToken: hashedFp,
+      },
+    },
+  })
+  if (existing) {
+    throw new Error("ALREADY_VOTED")
+  }
+
+  await prisma.publicVote.create({
+    data: {
+      challengeId,
+      teamId,
+      voterToken: hashedFp,
+      votingSessionId: challenge.votingSessionId,
+    },
+  })
 }
 
 export async function submitJuryVote(
-  input: unknown,
-  command: JuryVoteCommand,
-): Promise<VoteServiceSuccess> {
-  const validated = validateJuryVoteInput(input);
-
-  assertActorIsJury(command.actor);
-
-  const match = await getVotingMatchById(validated.matchId);
-
-  if (!match) {
-    throw new NotFoundError(`Match not found: ${validated.matchId}`);
+  challengeId: string,
+  teamId: string,
+  jurorId: string,
+) {
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: challengeId },
+    select: { phase: true, votingEndsAt: true, votingSessionId: true },
+  })
+  if (!challenge || challenge.phase !== "VOTING") {
+    throw new Error("VOTING_NOT_OPEN")
+  }
+  if (isVotingClosed(challenge.votingEndsAt)) {
+    throw new Error("VOTING_CLOSED")
+  }
+  if (!challenge.votingSessionId) {
+    throw new Error("VOTING_NOT_OPEN")
   }
 
-  assertMatchPhaseIsVoting(match.phase);
-  assertTeamBelongsToMatch(validated.teamId, match);
-
-  const alreadyVoted = await hasJuryVote(validated.matchId, command.actor.id);
-
-  if (alreadyVoted) {
-    throw new ConflictError("Jury user already voted for this match");
+  const team = await prisma.team.findFirst({
+    where: { id: teamId, challengeId },
+    select: { id: true },
+  })
+  if (!team) {
+    throw new Error("INVALID_TEAM")
   }
 
-  await insertJuryVote({
-    matchId: validated.matchId,
-    teamId: validated.teamId,
-    userId: command.actor.id,
-  });
+  const existing = await prisma.juryVote.findUnique({
+    where: {
+      challengeId_votingSessionId_jurorId: {
+        challengeId,
+        votingSessionId: challenge.votingSessionId,
+        jurorId,
+      },
+    },
+  })
+  if (existing) {
+    throw new Error("ALREADY_VOTED")
+  }
 
-  return { success: true };
+  await prisma.juryVote.create({
+    data: {
+      challengeId,
+      teamId,
+      jurorId,
+      votingSessionId: challenge.votingSessionId,
+    },
+  })
 }

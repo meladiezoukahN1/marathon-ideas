@@ -1,10 +1,166 @@
 generator client {
-  provider   = "prisma-client-js"
-  engineType = "binary"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Event (top-level container) ─────────────────────────────────────────────
+model Event {
+  id               String      @id @default(cuid())
+  name             String
+  description      String?     @db.Text
+  status           EventStatus @default(UPCOMING)
+  activeChallengeId String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  challenges Challenge[]
+  users      User[]
+
+  @@index([status])
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  role      UserRole
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  createdAt DateTime @default(now())
+
+  juryVotes JuryVote[]
+
+  @@index([eventId, role])
+}
+
+// ─── Challenge (one competition slot) ────────────────────────────────────────
+model Challenge {
+  id          String          @id @default(cuid())
+  eventId     String
+  event       Event           @relation(fields: [eventId], references: [id])
+  name        String
+  description String?         @db.Text
+  slug        String
+  order       Int
+  status      ChallengeStatus @default(PENDING)
+  phase       ChallengePhase  @default(WAITING)
+  timerSecs   Int             @default(600)
+  timerActive Boolean         @default(false)
+  voteOpenAt           DateTime?
+  voteCloseAt          DateTime?
+  votingStartedAt      DateTime?
+  votingEndsAt         DateTime?
+  votingDurationSeconds Int     @default(120)
+  votingSessionId      String?
+  winnerId             String?
+
+  team1FinalScore  Float?
+  team2FinalScore  Float?
+  team1PublicPct   Float?
+  team2PublicPct   Float?
+  team1JuryPct     Float?
+  team2JuryPct     Float?
+
+  team1TimerDurationSeconds  Int      @default(600)
+  team1TimerRemainingSeconds Int      @default(600)
+  team1TimerStatus           String   @default("READY")
+  team1TimerStartedAt        DateTime?
+  team1TimerPausedAt         DateTime?
+
+  team2TimerDurationSeconds  Int      @default(600)
+  team2TimerRemainingSeconds Int      @default(600)
+  team2TimerStatus           String   @default("READY")
+  team2TimerStartedAt        DateTime?
+  team2TimerPausedAt         DateTime?
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  winner      Team?        @relation("ChallengeWinner", fields: [winnerId], references: [id])
+  teams       Team[]
+  publicVotes PublicVote[]
+  juryVotes   JuryVote[]
+
+  @@unique([eventId, slug])
+  @@index([eventId, status])
+  @@index([eventId, order])
+}
+
+// ─── Team ─────────────────────────────────────────────────────────────────────
+model Team {
+  id          String    @id @default(cuid())
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  name        String
+  idea        String    @db.Text
+  members     String?   @db.Text
+  imageUrl    String?
+  slot        TeamSlot
+  createdAt   DateTime  @default(now())
+
+  publicVotes   PublicVote[]
+  juryVotes     JuryVote[]
+  wonChallenges Challenge[]  @relation("ChallengeWinner")
+
+  @@unique([challengeId, slot])
+  @@index([challengeId])
+}
+
+// ─── PublicVote ───────────────────────────────────────────────────────────────
+model PublicVote {
+  id               String    @id @default(cuid())
+  challengeId      String
+  challenge        Challenge @relation(fields: [challengeId], references: [id])
+  teamId           String
+  team             Team      @relation(fields: [teamId], references: [id])
+  voterToken       String
+  votingSessionId  String    @default("legacy")
+  createdAt        DateTime  @default(now())
+
+  @@unique([challengeId, votingSessionId, voterToken])
+  @@index([challengeId, teamId])
+}
+
+// ─── JuryVote ────────────────────────────────────────────────────────────────
+model JuryVote {
+  id               String    @id @default(cuid())
+  challengeId      String
+  challenge        Challenge @relation(fields: [challengeId], references: [id])
+  teamId           String
+  team             Team      @relation(fields: [teamId], references: [id])
+  jurorId          String
+  juror            User      @relation(fields: [jurorId], references: [id])
+  votingSessionId  String    @default("legacy")
+  createdAt        DateTime  @default(now())
+
+  @@unique([challengeId, votingSessionId, jurorId])
+  @@index([challengeId])
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+enum EventStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+}
+
+enum ChallengeStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+}
+
+enum ChallengePhase {
+  WAITING
+  PRESENTING
+  VOTING
+  RESULT
+  FINISHED
 }
 
 enum UserRole {
@@ -13,187 +169,7 @@ enum UserRole {
   JURY
 }
 
-enum MatchPhase {
-  WAITING
-  BRACKET_PREVIEW
-  PRESENTING_TEAM1
-  PRESENTING_TEAM2
-  VOTING
-  CLOSED
-  WINNER_REVEAL
-  BRACKET_UPDATE
-  RESULT
-}
-
-enum ResultStatus {
-  NOT_CALCULATED
-  CALCULATED
-  TIE_PENDING
-  TIE_RESOLVED
-}
-
-enum DisplayMode {
-  EVENT_WAITING
-  BRACKET_PREVIEW
-  PRESENTING_TEAM
-  VOTING
-  VOTING_CLOSED
-  WINNER_REVEAL
-  BRACKET_UPDATE
-  FINAL_BRACKET
-  EVENT_FINISHED
-}
-
-enum AuditAction {
-  USER_CREATED
-  USER_UPDATED
-  USER_DEACTIVATED
-  TEAM_UPDATED
-  PHASE_CHANGED
-  TIMER_CHANGED
-  VOTING_OPENED
-  VOTING_CLOSED
-  RESULT_CALCULATED
-  RESULT_SHOWN
-  TIE_RESOLVED
-  DISPLAY_MODE_CHANGED
-}
-
-model User {
-  id           String     @id @default(cuid())
-  name         String
-  username     String     @unique
-  passwordHash String
-  role         UserRole
-  isActive     Boolean    @default(true)
-  createdBy    String?
-  juryVotes    JuryVote[]
-  auditLogs    AuditLog[] @relation("AuditActor")
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-
-  @@index([role, isActive])
-  @@map("users")
-}
-
-model Challenge {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  nameAr    String
-  order     Int      @unique
-  match     Match?
-  teams     Team[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("challenges")
-}
-
-model Team {
-  id          String       @id @default(cuid())
-  nameAr      String
-  ideaAr      String
-  challengeId String
-  challenge   Challenge    @relation(fields: [challengeId], references: [id])
-  asTeam1     Match[]      @relation("Team1")
-  asTeam2     Match[]      @relation("Team2")
-  wonMatches  Match[]      @relation("Winner")
-  juryVotes   JuryVote[]
-  publicVotes PublicVote[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  @@index([challengeId])
-  @@map("teams")
-}
-
-model Match {
-  id            String       @id @default(cuid())
-  challengeId   String       @unique
-  challenge     Challenge    @relation(fields: [challengeId], references: [id])
-  team1Id       String
-  team1         Team         @relation("Team1", fields: [team1Id], references: [id])
-  team2Id       String
-  team2         Team         @relation("Team2", fields: [team2Id], references: [id])
-  winnerId      String?
-  winner        Team?        @relation("Winner", fields: [winnerId], references: [id])
-  phase         MatchPhase   @default(WAITING)
-  resultStatus  ResultStatus @default(NOT_CALCULATED)
-  team1Final    Float?
-  team2Final    Float?
-  timerSecs     Int          @default(600)
-  timerActive   Boolean      @default(false)
-  voteOpenAt    DateTime?
-  voteCloseAt   DateTime?
-  resultShownAt DateTime?
-  juryVotes     JuryVote[]
-  publicVotes   PublicVote[]
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-
-  @@index([phase])
-  @@index([resultStatus])
-  @@index([winnerId])
-  @@map("matches")
-}
-
-model JuryVote {
-  id        String   @id @default(cuid())
-  matchId   String
-  match     Match    @relation(fields: [matchId], references: [id])
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  teamId    String
-  team      Team     @relation(fields: [teamId], references: [id])
-  createdAt DateTime @default(now())
-
-  @@unique([matchId, userId])
-  @@index([matchId, teamId])
-  @@index([userId])
-  @@map("jury_votes")
-}
-
-model PublicVote {
-  id              String   @id @default(cuid())
-  matchId         String
-  match           Match    @relation(fields: [matchId], references: [id])
-  teamId          String
-  team            Team     @relation(fields: [teamId], references: [id])
-  hashedIp        String
-  fingerprintHash String
-  createdAt       DateTime @default(now())
-
-  @@index([matchId])
-  @@index([matchId, hashedIp])
-  @@index([matchId, fingerprintHash])
-  @@index([matchId, teamId])
-  @@map("public_votes")
-}
-
-model EventControl {
-  id             String      @id @default(cuid())
-  displayMode    DisplayMode @default(EVENT_WAITING)
-  currentMatchId String?
-  updatedBy      String?
-  updatedAt      DateTime    @updatedAt
-  createdAt      DateTime    @default(now())
-
-  @@map("event_control")
-}
-
-model AuditLog {
-  id        String      @id @default(cuid())
-  actorId   String?
-  actor     User?       @relation("AuditActor", fields: [actorId], references: [id])
-  action    AuditAction
-  entity    String
-  entityId  String?
-  metadata  Json?
-  createdAt DateTime    @default(now())
-
-  @@index([actorId])
-  @@index([action])
-  @@index([entity, entityId])
-  @@index([createdAt])
-  @@map("audit_logs")
+enum TeamSlot {
+  TEAM1
+  TEAM2
 }

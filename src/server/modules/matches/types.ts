@@ -1,60 +1,82 @@
-import type { CurrentUser } from "@/server/core/session";
+export type TimerStatus = "READY" | "RUNNING" | "PAUSED" | "FINISHED"
+export type TeamSlot = "TEAM1" | "TEAM2"
 
-export type MatchPhaseValue =
-  | "WAITING"
-  | "BRACKET_PREVIEW"
-  | "PRESENTING_TEAM1"
-  | "PRESENTING_TEAM2"
-  | "VOTING"
-  | "CLOSED"
-  | "WINNER_REVEAL"
-  | "BRACKET_UPDATE"
-  | "RESULT";
-
-export type TimerAction = "play" | "pause" | "reset" | "adjust";
-
-export interface MatchRecord {
-  id: string;
-  challengeId: string;
-  team1Id: string;
-  team2Id: string;
-  winnerId: string | null;
-  phase: MatchPhaseValue;
-  timerSecs: number;
-  timerActive: boolean;
-  voteOpenAt: Date | null;
-  voteCloseAt: Date | null;
-  resultShownAt: Date | null;
-  updatedAt: Date;
+export interface TimerState {
+  matchId: string
+  teamSlot: TeamSlot
+  durationSeconds: number
+  remainingSeconds: number
+  status: TimerStatus
+  startedAt: string | null
+  pausedAt: string | null
+  updatedAt: string
 }
 
-export interface ChangeMatchPhaseRequestInput {
-  matchId: string;
-  phase: MatchPhaseValue;
+export interface TimerPayload {
+  remainingSeconds?: number
+  deltaSeconds?: number
 }
 
-export interface OpenVotingRequestInput {
-  matchId: string;
+export interface AdminMatchListItem {
+  id: string
+  name: string
+  order: number
+  status: string
+  phase: string
+  winnerId: string | null
+  voteOpenAt: string | null
+  voteCloseAt: string | null
+  votingStartedAt: string | null
+  votingEndsAt: string | null
+  votingDurationSeconds: number
+  votingSessionId: string | null
+  team1FinalScore: number | null
+  team2FinalScore: number | null
+  team1PublicPct: number | null
+  team2PublicPct: number | null
+  team1JuryPct: number | null
+  team2JuryPct: number | null
+  team1: { id: string; name: string } | null
+  team2: { id: string; name: string } | null
+  team1Timer: TimerState
+  team2Timer: TimerState
 }
 
-export interface CloseVotingRequestInput {
-  matchId: string;
+export interface PublicActiveMatch {
+  id: string
+  name: string
+  order: number
+  phase: string
+  winnerId: string | null
+  votingEndsAt: string | null
+  votingSessionId: string | null
+  team1: { id: string; name: string; imageUrl: string | null } | null
+  team2: { id: string; name: string; imageUrl: string | null } | null
+  team1Timer: TimerState
+  team2Timer: TimerState
+  serverNow: string
 }
 
-export interface ChangeMatchPhaseCommand {
-  actor: CurrentUser;
+export interface VoteCounts {
+  team1Public: number
+  team2Public: number
+  totalPublic: number
+  team1Jury: number
+  team2Jury: number
+  totalJury: number
 }
 
-export interface VotingControlCommand {
-  actor: CurrentUser;
+export interface MatchResult {
+  winnerId: string | null
+  team1FinalScore: number
+  team2FinalScore: number
+  team1PublicPct: number
+  team2PublicPct: number
+  team1JuryPct: number
+  team2JuryPct: number
 }
 
-export interface TimerActionRequestInput {
-  matchId: string;
-  action: TimerAction;
-  delta?: number;
-}
-
-export interface TimerActionCommand {
-  actor: CurrentUser;
+export interface CurrentUser {
+  id: string
+  role: "SUPERADMIN" | "ADMIN" | "JURY"
 }

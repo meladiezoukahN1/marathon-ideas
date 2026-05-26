@@ -1,181 +1,162 @@
-import "dotenv/config";
+import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
-import logger from "../src/lib/logger";
-import { prisma } from "../src/lib/prisma/client";
+const prisma = new PrismaClient();
 
-const challenges = [
-  {
-    slug: "digital",
-    nameAr: "التحول الرقمي والخدمات الحكومية والاجتماعية",
-    order: 1,
-  },
-  { slug: "agriculture", nameAr: "الزراعة والأمن الغذائي", order: 2 },
-  { slug: "transport", nameAr: "النقل والخدمات الذكية", order: 3 },
-] as const;
+async function main() {
+  console.log("🌱 Seeding database...");
 
-type ChallengeMap = Record<(typeof challenges)[number]["slug"], string>;
-
-async function seedChallenges(): Promise<ChallengeMap> {
-  const map = {} as ChallengeMap;
-
-  for (const challenge of challenges) {
-    const saved = await prisma.challenge.upsert({
-      where: { slug: challenge.slug },
-      update: {
-        nameAr: challenge.nameAr,
-        order: challenge.order,
-      },
-      create: {
-        slug: challenge.slug,
-        nameAr: challenge.nameAr,
-        order: challenge.order,
-      },
-      select: { id: true, slug: true },
-    });
-
-    map[saved.slug as keyof ChallengeMap] = saved.id;
-  }
-
-  return map;
-}
-
-async function seedTeams(challengeIds: ChallengeMap): Promise<void> {
-  const teams = [
-    {
-      id: "team-digital-1",
-      challengeSlug: "digital",
-      nameAr: "فريق التحول 1",
-      ideaAr: "منصة رقمية للخدمات الحكومية",
-    },
-    {
-      id: "team-digital-2",
-      challengeSlug: "digital",
-      nameAr: "فريق التحول 2",
-      ideaAr: "تطبيق الهوية الرقمية",
-    },
-    {
-      id: "team-agriculture-1",
-      challengeSlug: "agriculture",
-      nameAr: "فريق الزراعة 1",
-      ideaAr: "نظام ري ذكي",
-    },
-    {
-      id: "team-agriculture-2",
-      challengeSlug: "agriculture",
-      nameAr: "فريق الزراعة 2",
-      ideaAr: "سوق إلكتروني للمزارعين",
-    },
-    {
-      id: "team-transport-1",
-      challengeSlug: "transport",
-      nameAr: "فريق النقل 1",
-      ideaAr: "تطبيق المواصلات الذكية",
-    },
-    {
-      id: "team-transport-2",
-      challengeSlug: "transport",
-      nameAr: "فريق النقل 2",
-      ideaAr: "نظام مشاركة السيارات",
-    },
-  ] as const;
-
-  for (const team of teams) {
-    await prisma.team.upsert({
-      where: { id: team.id },
-      update: { ideaAr: team.ideaAr },
-      create: {
-        id: team.id,
-        challengeId: challengeIds[team.challengeSlug],
-        nameAr: team.nameAr,
-        ideaAr: team.ideaAr,
-      },
-      select: { id: true },
-    });
-  }
-}
-
-async function seedMatches(challengeIds: ChallengeMap): Promise<void> {
-  const teamPairBySlug: Record<(typeof challenges)[number]["slug"], [string, string]> = {
-    digital: ["team-digital-1", "team-digital-2"],
-    agriculture: ["team-agriculture-1", "team-agriculture-2"],
-    transport: ["team-transport-1", "team-transport-2"],
-  };
-
-  for (const challenge of challenges) {
-    const [team1Id, team2Id] = teamPairBySlug[challenge.slug];
-
-    await prisma.match.upsert({
-      where: { challengeId: challengeIds[challenge.slug] },
-      update: {
-        team1Id,
-        team2Id,
-      },
-      create: {
-        challengeId: challengeIds[challenge.slug],
-        team1Id,
-        team2Id,
-      },
-      select: { id: true },
-    });
-  }
-}
-
-async function seedEventControl(): Promise<void> {
-  await prisma.eventControl.upsert({
-    where: { id: "default-event-control" },
+  // Event
+  const event = await prisma.event.upsert({
+    where: { id: "event-001" },
     update: {},
     create: {
-      id: "default-event-control",
+      id: "event-001",
+      name: "ماراثون الأفكار 2025",
+      description: "منافسة الأفكار الريادية بين أفضل المشاريع",
+      status: "ACTIVE",
     },
-    select: { id: true },
   });
-}
 
-async function seedSuperAdmin(): Promise<void> {
-  const username = process.env.SUPERADMIN_USERNAME;
-  const password = process.env.SUPERADMIN_PASSWORD;
-
-  if (!username || !password) {
-    throw new Error("SUPERADMIN_USERNAME and SUPERADMIN_PASSWORD are required");
-  }
-
-  const passwordHash = await bcrypt.hash(password, 12);
-
+  // SuperAdmin
   await prisma.user.upsert({
-    where: { username },
-    update: {
-      name: "Super Admin",
-      passwordHash,
-      role: "SUPERADMIN",
-      isActive: true,
-    },
+    where: { username: "superadmin" },
+    update: {},
     create: {
-      name: "Super Admin",
-      username,
-      passwordHash,
+      username: "superadmin",
+      password: await bcrypt.hash("Super@2025", 12),
       role: "SUPERADMIN",
-      isActive: true,
+      eventId: event.id,
     },
-    select: { id: true },
   });
-}
 
-async function main(): Promise<void> {
-  try {
-    const challengeIds = await seedChallenges();
-    await seedTeams(challengeIds);
-    await seedMatches(challengeIds);
-    await seedEventControl();
-    await seedSuperAdmin();
+  // Admin
+  await prisma.user.upsert({
+    where: { username: "admin" },
+    update: {},
+    create: {
+      username: "admin",
+      password: await bcrypt.hash("Admin@2025", 12),
+      role: "ADMIN",
+      eventId: event.id,
+    },
+  });
 
-    logger.info("Database seed completed successfully");
-  } catch (error) {
-    logger.error({ err: error }, "Database seed failed");
-    throw error;
-  } finally {
-    await prisma.$disconnect();
+  // 5 Jury members
+  for (let i = 1; i <= 5; i++) {
+    await prisma.user.upsert({
+      where: { username: `jury${i}` },
+      update: {},
+      create: {
+        username: `jury${i}`,
+        password: await bcrypt.hash(`Jury${i}@2025`, 12),
+        role: "JURY",
+        eventId: event.id,
+      },
+    });
   }
+
+  // Challenge A — Digital
+  const cA = await prisma.challenge.upsert({
+    where: { eventId_slug: { eventId: event.id, slug: "digital" } },
+    update: {},
+    create: {
+      eventId: event.id,
+      name: "التحول الرقمي والخدمات الحكومية",
+      description: "حلول رقمية مبتكرة لتحسين الخدمات الحكومية والاجتماعية",
+      slug: "digital",
+      order: 1,
+      status: "ACTIVE",
+    },
+  });
+  await prisma.team.upsert({
+    where: { challengeId_slot: { challengeId: cA.id, slot: "TEAM1" } },
+    update: {},
+    create: {
+      challengeId: cA.id, slot: "TEAM1",
+      name: "فريق الرؤية الرقمية",
+      idea: "منصة موحدة لتقديم الخدمات الحكومية إلكترونياً مع دعم الذكاء الاصطناعي لتوجيه المواطنين وتسريع المعاملات",
+    },
+  });
+  await prisma.team.upsert({
+    where: { challengeId_slot: { challengeId: cA.id, slot: "TEAM2" } },
+    update: {},
+    create: {
+      challengeId: cA.id, slot: "TEAM2",
+      name: "فريق التحول الذكي",
+      idea: "تطبيق موبايل يربط المواطن بجميع الجهات الحكومية مع إشعارات فورية وتتبع الطلبات والمدفوعات",
+    },
+  });
+
+  // Challenge B — Agriculture
+  const cB = await prisma.challenge.upsert({
+    where: { eventId_slug: { eventId: event.id, slug: "agriculture" } },
+    update: {},
+    create: {
+      eventId: event.id,
+      name: "الزراعة والأمن الغذائي",
+      description: "مشاريع تعزز الأمن الغذائي وتطور القطاع الزراعي",
+      slug: "agriculture",
+      order: 2,
+    },
+  });
+  await prisma.team.upsert({
+    where: { challengeId_slot: { challengeId: cB.id, slot: "TEAM1" } },
+    update: {},
+    create: {
+      challengeId: cB.id, slot: "TEAM1",
+      name: "فريق الحصاد الذكي",
+      idea: "نظام استشعار IoT لمراقبة التربة والمحاصيل وتحسين استخدام المياه بنسبة 40% مع تنبيهات آنية",
+    },
+  });
+  await prisma.team.upsert({
+    where: { challengeId_slot: { challengeId: cB.id, slot: "TEAM2" } },
+    update: {},
+    create: {
+      challengeId: cB.id, slot: "TEAM2",
+      name: "فريق الغذاء المستدام",
+      idea: "سوق رقمي يربط المزارعين مباشرة بالمستهلكين مع ضمان سلسلة تبريد آمنة وتتبع الجودة",
+    },
+  });
+
+  // Challenge C — Transport
+  const cC = await prisma.challenge.upsert({
+    where: { eventId_slug: { eventId: event.id, slug: "transport" } },
+    update: {},
+    create: {
+      eventId: event.id,
+      name: "النقل والخدمات الذكية",
+      description: "حلول النقل الذكي وتحسين تجربة التنقل في المدن",
+      slug: "transport",
+      order: 3,
+    },
+  });
+  await prisma.team.upsert({
+    where: { challengeId_slot: { challengeId: cC.id, slot: "TEAM1" } },
+    update: {},
+    create: {
+      challengeId: cC.id, slot: "TEAM1",
+      name: "فريق المدينة الذكية",
+      idea: "منظومة إشارات مرورية ذكية تعمل بالذكاء الاصطناعي لتقليل الازدحام بنسبة 35% وتوفير الوقت",
+    },
+  });
+  await prisma.team.upsert({
+    where: { challengeId_slot: { challengeId: cC.id, slot: "TEAM2" } },
+    update: {},
+    create: {
+      challengeId: cC.id, slot: "TEAM2",
+      name: "فريق التنقل الأخضر",
+      idea: "تطبيق لمشاركة وسائل النقل الكهربائي مع نظام نقاط مكافأة للمستخدمين وتخفيض انبعاثات الكربون",
+    },
+  });
+
+  console.log("✅ Seed complete!");
+  console.log("─".repeat(40));
+  console.log("superadmin / Super@2025");
+  console.log("admin      / Admin@2025");
+  console.log("jury1..5   / Jury1@2025 .. Jury5@2025");
 }
 
-void main();
+main()
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(() => prisma.$disconnect());

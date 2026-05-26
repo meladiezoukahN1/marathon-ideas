@@ -1,0 +1,66 @@
+# Marathon V3 Full Project File Index
+
+Extracted project files: 60
+
+## Files
+
+- `.env.example` — source: `Pasted text (5).txt`
+- `.gitignore` — source: `Pasted text (5).txt`
+- `jest.config.ts` — source: `Pasted text (5).txt`
+- `next.config.js` — source: `Pasted text (5).txt`
+- `package.json` — source: `Pasted text(131).txt`
+- `postcss.config.js` — source: `Pasted text (5).txt`
+- `prisma/schema.prisma` — source: `Pasted text(131).txt`
+- `prisma/seed.ts` — source: `Pasted text(131).txt`
+- `server.ts` — source: `Pasted text (5).txt`
+- `src/app/admin/challenges/page.tsx` — source: `Pasted text (4)(1).txt`
+- `src/app/admin/layout.tsx` — source: `Pasted text (4)(1).txt`
+- `src/app/admin/page.tsx` — source: `Pasted text (4)(1).txt`
+- `src/app/admin/teams/page.tsx` — source: `Pasted text (4)(1).txt`
+- `src/app/admin/users/page.tsx` — source: `Pasted text (4)(1).txt`
+- `src/app/api/admin/route.ts` — source: `Pasted text (4).txt`
+- `src/app/api/auth/[...nextauth]/route.ts` — source: `Pasted text (4).txt`
+- `src/app/api/challenges/[id]/route.ts` — source: `Pasted text (4).txt`
+- `src/app/api/challenges/route.ts` — source: `Pasted text (4).txt`
+- `src/app/api/events/route.ts` — source: `Pasted text (4).txt`
+- `src/app/api/jury-vote/route.ts` — source: `Pasted text (4).txt`
+- `src/app/api/teams/[id]/route.ts` — source: `Pasted text (4).txt`
+- `src/app/api/teams/route.ts` — source: `Pasted text (4).txt`
+- `src/app/api/users/route.ts` — source: `Pasted text (4).txt`
+- `src/app/api/votes/route.ts` — source: `Pasted text (4).txt`
+- `src/app/display/page.tsx` — source: `Pasted text (3)(1).txt`
+- `src/app/globals.css` — source: `Pasted text (3)(1).txt`
+- `src/app/jury/layout.tsx` — source: `Pasted text (3)(1).txt`
+- `src/app/jury/page.tsx` — source: `Pasted text (3)(1).txt`
+- `src/app/layout.tsx` — source: `Pasted text (3)(1).txt`
+- `src/app/login/page.tsx` — source: `Pasted text (3)(1).txt`
+- `src/app/page.tsx` — source: `Pasted text (3)(1).txt`
+- `src/app/vote/[challengeId]/page.tsx` — source: `Pasted text (3)(1).txt`
+- `src/components/admin/AdminNav.tsx` — source: `Pasted text (4)(1).txt`
+- `src/components/shared/Providers.tsx` — source: `Pasted text (3)(1).txt`
+- `src/components/ui/Badge.tsx` — source: `Pasted text (6).txt`
+- `src/components/ui/Button.tsx` — source: `Pasted text (6).txt`
+- `src/components/ui/Input.tsx` — source: `Pasted text (6).txt`
+- `src/components/ui/Modal.tsx` — source: `Pasted text (6).txt`
+- `src/components/ui/ProgressBar.tsx` — source: `Pasted text (6).txt`
+- `src/components/ui/Skeleton.tsx` — source: `Pasted text (6).txt`
+- `src/components/ui/Textarea.tsx` — source: `Pasted text (6).txt`
+- `src/hooks/useChallengeUpdates.ts` — source: `Pasted text (6).txt`
+- `src/hooks/useSocket.ts` — source: `Pasted text (6).txt`
+- `src/hooks/useTimer.ts` — source: `Pasted text (6).txt`
+- `src/hooks/useVoteCount.ts` — source: `Pasted text (6).txt`
+- `src/lib/actions/challenge.actions.ts` — source: `Pasted text (3).txt`
+- `src/lib/animation.ts` — source: `Pasted text (2)(1).txt`
+- `src/lib/fingerprint.ts` — source: `Pasted text (2)(1).txt`
+- `src/lib/prisma.ts` — source: `Pasted text (2)(1).txt`
+- `src/lib/socket.ts` — source: `Pasted text (2)(1).txt`
+- `src/lib/validators/index.ts` — source: `Pasted text (3).txt`
+- `src/lib/vote-calc.ts` — source: `Pasted text (2)(1).txt`
+- `src/store/eventStore.ts` — source: `Pasted text (6).txt`
+- `src/types/domain.types.ts` — source: `Pasted text (2)(1).txt`
+- `src/types/next-auth.d.ts` — source: `Pasted text (2)(1).txt`
+- `src/types/socket.types.ts` — source: `Pasted text (2)(1).txt`
+- `tailwind.config.ts` — source: `Pasted text (5).txt`
+- `tests/vote-calc.test.ts` — source: `Pasted text (5).txt`
+- `tsconfig.json` — source: `Pasted text(131).txt`
+- `tsconfig.server.json` — source: `Pasted text(131).txt`

@@ -1,9 +1,15 @@
-import { ForbiddenError } from "../../core/errors";
-import type { CurrentUser } from "../../core/session";
-import { isAdminRole } from "../../../shared/constants/permissions";
+import type { CurrentUser } from "./types"
 
-export function assertCanControlMatch(actor: CurrentUser): void {
-  if (!isAdminRole(actor.role)) {
-    throw new ForbiddenError("Only ADMIN or SUPERADMIN can control matches");
+export class ForbiddenError extends Error {
+  constructor(message = "Forbidden") {
+    super(message)
+    this.name = "ForbiddenError"
+  }
+}
+
+export function assertIsAdmin(user: CurrentUser | null): asserts user is CurrentUser {
+  if (!user) throw new ForbiddenError("Authentication required")
+  if (user.role !== "ADMIN" && user.role !== "SUPERADMIN") {
+    throw new ForbiddenError("Admin access required")
   }
 }

@@ -1,36 +1,23 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import type { ReactNode } from "react"
+import type { Metadata } from "next"
+import { Toaster } from "react-hot-toast"
+import { Providers } from "@/components/shared/Providers"
+import "./globals.css"
 
 export const metadata: Metadata = {
   title: "ماراثون الأفكار",
-  description: "نظام مسابقات حي للأفكار الريادية",
-};
+  description: "نظام التصويت التفاعلي للمسابقات الريادية",
+}
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html
-      lang="ar"
-      dir="rtl"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full bg-background text-foreground antialiased">
-        <div className="flex min-h-screen flex-col">{children}</div>
+    <html lang="ar" dir="rtl">
+      <body>
+        <Providers>
+          {children}
+          <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
+        </Providers>
       </body>
     </html>
-  );
+  )
 }
