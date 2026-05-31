@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { writeFile } from "fs/promises"
-import { mkdir } from "fs/promises"
-import { join } from "path"
-import crypto from "crypto"
+import { put } from "@vercel/blob"
 import type { ApiResponse } from "@/types/domain.types"
 
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"]
-const MAX_SIZE = 5 * 1024 * 1024 // 5MB
+const MAX_SIZE = 4 * 1024 * 1024 // 4MB
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,20 +29,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<ApiResponse<null>>({ data: null, error: "FILE_TOO_LARGE" }, { status: 400 })
     }
 
-    const ext = file.type === "image/png" ? "png" : file.type === "image/jpeg" ? "jpg" : "webp"
-    const hash = crypto.randomBytes(8).toString("hex")
-    const filename = `${hash}.${ext}`
-    const uploadDir = join(process.cwd(), "public", "uploads", "teams")
-    const filepath = join(uploadDir, filename)
+    const blob = await put(`teams/${file.name}`, file, {
+      access: "public",
+      addRandomSuffix: true,
+      contentType: file.type,
+    })
 
-    await mkdir(uploadDir, { recursive: true })
-
-    const bytes = await file.arrayBuffer()
-    await writeFile(filepath, Buffer.from(bytes))
-
-    const url = `/uploads/teams/${filename}`
-
-    return NextResponse.json<ApiResponse<{ url: string }>>({ data: { url }, error: null })
+    return NextResponse.json<ApiResponse<{ url: string }>>({ data: { url: blob.url }, error: null })
   } catch (err) {
     console.error("[POST /api/admin/upload/image]", err)
     return NextResponse.json<ApiResponse<null>>({ data: null, error: "SERVER_ERROR" }, { status: 500 })

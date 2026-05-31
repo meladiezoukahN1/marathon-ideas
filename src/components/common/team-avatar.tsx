@@ -23,14 +23,14 @@ export function TeamAvatar({ name, imageUrl, size = "md", className = "" }: Team
       <img
         src={imageUrl}
         alt={name}
-        className={`${sizeClass} rounded-full object-cover border-2 border-gray-700 ${className}`}
+        className={`${sizeClass} ${className}`}
       />
     )
   }
 
   return (
     <div
-      className={`${sizeClass} rounded-full bg-gray-700 flex items-center justify-center font-black text-white ${className}`}
+      className={`${sizeClass}  flex items-center justify-center font-black text-white ${className}`}
     >
       {name.charAt(0)}
     </div>

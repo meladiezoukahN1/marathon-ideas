@@ -49,7 +49,7 @@ export const updateTeamSchema = z.object({
   name:     z.string().min(2).max(100).optional(),
   idea:     z.string().min(10).max(1000).optional(),
   members:  z.string().max(500).optional(),
-  imageUrl: z.string().url().max(500).optional().or(z.literal("")),
+  imageUrl: z.string().url().max(500).nullable().optional(),
 })
 
 export const createChallengeSchema = z.object({

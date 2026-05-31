@@ -3,7 +3,13 @@
 /**
  * Lightweight fingerprint — no external library.
  * Good enough for a live event: stops casual double-voting.
- * Real guarantee is the DB @@unique constraint.
+ * Real guarantee is the server-side Redis SET NX lock scoped to challengeId + votingSessionId.
+ *
+ * Anonymous voting limitation:
+ * One vote per browser voterToken per challenge/session.
+ * Does NOT guarantee one vote per real human across browsers/devices.
+ * Firefox in anonymous/private mode generates a different voterToken and can vote again.
+ * This is expected and acceptable for public anonymous voting.
  */
 export function generateVoterToken(): string {
   const parts = [
@@ -22,21 +28,20 @@ export function generateVoterToken(): string {
   return Math.abs(h >>> 0).toString(36).padStart(8, "0")
 }
 
+function localKey(challengeId: string, voteSessionId: string): string {
+  return `vote:${challengeId}:${voteSessionId}`
+}
+
 export function hasVotedLocally(challengeId: string, voteSessionId?: string | null): boolean {
   if (typeof window === "undefined") return false
-  const key = `voted:${challengeId}`
-  const stored = localStorage.getItem(key)
-  if (!stored) return false
-  // If voteSessionId is provided and doesn't match stored value, the vote is stale (challenge was reset)
-  if (voteSessionId !== undefined && stored !== voteSessionId) {
-    localStorage.removeItem(key)
-    return false
-  }
-  return true
+  if (!voteSessionId) return false
+  const key = localKey(challengeId, voteSessionId)
+  return localStorage.getItem(key) === "1"
 }
 
 export function markVotedLocally(challengeId: string, voteSessionId?: string | null): void {
   if (typeof window === "undefined") return
-  // Store a session identifier so we can detect resets
-  localStorage.setItem(`voted:${challengeId}`, voteSessionId || "1")
+  if (!voteSessionId) return
+  const key = localKey(challengeId, voteSessionId)
+  localStorage.setItem(key, "1")
 }

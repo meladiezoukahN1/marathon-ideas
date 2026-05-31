@@ -49,7 +49,9 @@ export function assertCanFinalizeResult(phase: ChallengePhase): void {
   }
 }
 
-export function assertVotingIsClosed(votingEndsAt: string | null): void {
+export function assertVotingIsClosed(votingEndsAt: string | null, votingTimerStatus?: string): void {
+  // If voting timer is paused or finished, treat as closed
+  if (votingTimerStatus === "PAUSED" || votingTimerStatus === "FINISHED") return
   if (!votingEndsAt) {
     throw new WorkflowError("Voting has not been started")
   }

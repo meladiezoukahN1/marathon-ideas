@@ -1,0 +1,2 @@
+ALTER TABLE `Challenge` ADD COLUMN `votingTimerStatus` VARCHAR(191) NOT NULL DEFAULT 'READY';
+ALTER TABLE `Challenge` ADD COLUMN `votingTimerPausedAt` DATETIME(3) NULL;

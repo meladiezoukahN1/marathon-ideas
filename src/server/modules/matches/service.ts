@@ -4,7 +4,6 @@ import {
   resetTimerState,
   setActiveMatch,
   updateChallengePhase,
-  getVoteCounts,
   storeResult,
   resetMatch as resetMatchRepo,
   getOtherActiveChallenge,
@@ -19,6 +18,7 @@ import {
   assertNoOtherActiveChallenge,
   assertChallengeCanBeActivated,
 } from "./workflow"
+import { getRedisVoteCounts } from "@/server/modules/voting/service"
 import crypto from "crypto"
 import type { TimerStatus, TeamSlot, TimerPayload } from "./types"
 
@@ -189,6 +189,8 @@ export async function changePhase(matchId: string, nextPhase: string, votingDura
     extra.votingEndsAt = endsAt
     extra.votingDurationSeconds = duration
     extra.votingSessionId = crypto.randomUUID()
+    extra.votingTimerStatus = "RUNNING"
+    extra.votingTimerPausedAt = null
     extra.status = "ACTIVE"
   }
   if (nextPhase === "RESULT") {
@@ -231,9 +233,20 @@ export async function calculateAndStoreResult(matchId: string) {
     }
   }
 
-  assertVotingIsClosed(match.votingEndsAt)
+  // If voting is still open (manual override), close it now without changing phase
+  if (match.votingTimerStatus === "RUNNING" && match.votingEndsAt) {
+    const endTime = new Date(match.votingEndsAt).getTime()
+    if (Date.now() < endTime - 5000) {
+      await updateChallengePhase(matchId, match.phase, {
+        voteCloseAt: new Date(),
+        votingTimerStatus: "FINISHED",
+      })
+    }
+  }
+  assertVotingIsClosed(match.votingEndsAt, match.votingTimerStatus)
 
-  const counts = await getVoteCounts(matchId)
+  if (!match.votingStartedAt) throw new Error("MATCH_NOT_READY")
+  const counts = await getRedisVoteCounts(matchId, new Date(match.votingStartedAt))
   const t1 = match.team1
   const t2 = match.team2
   if (!t1 || !t2) throw new Error("MATCH_NEEDS_TWO_TEAMS")
@@ -302,7 +315,11 @@ export async function calculateAndStoreResult(matchId: string) {
 }
 
 export async function getMatchVoteCounts(matchId: string) {
-  const counts = await getVoteCounts(matchId)
+  const match = await getMatchById(matchId)
+  if (!match || !match.votingStartedAt) {
+    return { team1Public: 0, team2Public: 0, totalPublic: 0, team1Jury: 0, team2Jury: 0, totalJury: 0 }
+  }
+  const counts = await getRedisVoteCounts(matchId, new Date(match.votingStartedAt))
   return counts
 }
 
@@ -311,6 +328,8 @@ export async function finalizeExpiredVotingIfNeeded(matchId: string) {
   if (!match) return null
   if (match.phase !== "VOTING") return match
   if (!match.votingEndsAt) return match
+  // Don't auto-finalize when voting is paused
+  if (match.votingTimerStatus === "PAUSED") return match
 
   const now = Date.now()
   const end = new Date(match.votingEndsAt).getTime()
@@ -327,6 +346,143 @@ export async function finalizeExpiredVotingIfNeeded(matchId: string) {
     return await getMatchById(matchId)
   } catch {
     return match
+  }
+}
+
+export function calculateVotingTimerRemaining(match: {
+  votingStartedAt: string | null
+  votingEndsAt: string | null
+  votingTimerStatus: string
+  votingTimerPausedAt: string | null
+  votingDurationSeconds: number
+}): number {
+  if (match.votingTimerStatus === "PAUSED" && match.votingTimerPausedAt && match.votingEndsAt) {
+    return Math.max(0, Math.floor((new Date(match.votingEndsAt).getTime() - new Date(match.votingTimerPausedAt).getTime()) / 1000))
+  }
+  if (match.votingTimerStatus === "RUNNING" && match.votingEndsAt) {
+    return Math.max(0, Math.floor((new Date(match.votingEndsAt).getTime() - Date.now()) / 1000))
+  }
+  if (match.votingTimerStatus === "FINISHED") return 0
+  return match.votingDurationSeconds
+}
+
+export function getVotingTimerDisplay(
+  status: string,
+  remaining: number,
+): string {
+  if (status === "RUNNING" && remaining <= 0) return "FINISHED"
+  return status
+}
+
+export async function pauseVotingTimer(matchId: string) {
+  const match = await getMatchById(matchId)
+  if (!match) throw new Error("MATCH_NOT_FOUND")
+  if (match.votingTimerStatus !== "RUNNING") {
+    return { votingTimer: { status: match.votingTimerStatus, remainingSeconds: calculateVotingTimerRemaining(match) } }
+  }
+
+  const pausedAt = new Date()
+  await updateChallengePhase(matchId, match.phase, {
+    votingTimerStatus: "PAUSED",
+    votingTimerPausedAt: pausedAt,
+  })
+
+  const updated = await getMatchById(matchId)
+  if (!updated) throw new Error("MATCH_NOT_FOUND")
+  return {
+    votingTimer: {
+      status: "PAUSED",
+      remainingSeconds: calculateVotingTimerRemaining(updated),
+      pausedAt: pausedAt.toISOString(),
+    },
+  }
+}
+
+export async function resumeVotingTimer(matchId: string) {
+  const match = await getMatchById(matchId)
+  if (!match) throw new Error("MATCH_NOT_FOUND")
+  if (match.votingTimerStatus !== "PAUSED") {
+    return { votingTimer: { status: match.votingTimerStatus, remainingSeconds: calculateVotingTimerRemaining(match) } }
+  }
+
+  const remaining = calculateVotingTimerRemaining(match)
+  const now = new Date()
+  const endsAt = new Date(now.getTime() + remaining * 1000)
+
+  await updateChallengePhase(matchId, match.phase, {
+    votingTimerStatus: "RUNNING",
+    votingTimerPausedAt: null,
+    votingEndsAt: endsAt,
+  })
+
+  const updated = await getMatchById(matchId)
+  if (!updated) throw new Error("MATCH_NOT_FOUND")
+  return {
+    votingTimer: {
+      status: "RUNNING",
+      remainingSeconds: remaining,
+      endsAt: endsAt.toISOString(),
+    },
+  }
+}
+
+export async function resetVotingTimer(matchId: string) {
+  const match = await getMatchById(matchId)
+  if (!match) throw new Error("MATCH_NOT_FOUND")
+
+  const duration = match.votingDurationSeconds
+  const now = new Date()
+  const endsAt = new Date(now.getTime() + duration * 1000)
+
+  await updateChallengePhase(matchId, match.phase, {
+    votingTimerStatus: "RUNNING",
+    votingTimerPausedAt: null,
+    votingEndsAt: endsAt,
+  })
+
+  const updated = await getMatchById(matchId)
+  if (!updated) throw new Error("MATCH_NOT_FOUND")
+  return {
+    votingTimer: {
+      status: "RUNNING",
+      remainingSeconds: duration,
+      endsAt: endsAt.toISOString(),
+    },
+  }
+}
+
+export async function patchVotingTimer(matchId: string, payload: { deltaSeconds?: number; remainingSeconds?: number }) {
+  const match = await getMatchById(matchId)
+  if (!match) throw new Error("MATCH_NOT_FOUND")
+
+  const currentRemaining = calculateVotingTimerRemaining(match)
+  let newRemaining = currentRemaining
+
+  if (payload.remainingSeconds !== undefined) {
+    newRemaining = Math.max(0, payload.remainingSeconds)
+  }
+  if (payload.deltaSeconds !== undefined) {
+    newRemaining = Math.max(0, currentRemaining + payload.deltaSeconds)
+  }
+
+  const now = new Date()
+  const endsAt = new Date(now.getTime() + newRemaining * 1000)
+  const newStatus = newRemaining <= 0 ? "FINISHED" : match.votingTimerStatus
+
+  await updateChallengePhase(matchId, match.phase, {
+    votingTimerStatus: newStatus,
+    votingTimerPausedAt: null,
+    votingEndsAt: endsAt,
+  })
+
+  const updated = await getMatchById(matchId)
+  if (!updated) throw new Error("MATCH_NOT_FOUND")
+  return {
+    votingTimer: {
+      status: newStatus,
+      remainingSeconds: newRemaining,
+      endsAt: endsAt.toISOString(),
+    },
   }
 }
 

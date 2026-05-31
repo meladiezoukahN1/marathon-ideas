@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { submitPublicVote } from "@/server/modules/voting/service"
 import { finalizeExpiredVotingIfNeeded } from "@/server/modules/matches/service"
-import { getVoteCounts } from "@/lib/actions/challenge.actions"
-import { emitToChallenge } from "@/lib/socket"
 import { publicVoteSchema } from "@/lib/validators"
 import type { ApiResponse } from "@/types/domain.types"
 
@@ -19,9 +17,6 @@ export async function POST(req: NextRequest) {
 
     await submitPublicVote(challengeId, teamId, voterToken)
 
-    const counts = await getVoteCounts(challengeId)
-    emitToChallenge(challengeId, "vote:count", counts)
-
     return NextResponse.json<ApiResponse<{ success: true }>>({ data: { success: true }, error: null })
   } catch (err: unknown) {
     if (err instanceof Error) {
@@ -36,6 +31,9 @@ export async function POST(req: NextRequest) {
       }
       if (err.message === "VOTING_CLOSED") {
         return NextResponse.json<ApiResponse<null>>({ data: null, error: "VOTING_CLOSED" }, { status: 400 })
+      }
+      if (err.message === "VOTING_TEMPORARILY_UNAVAILABLE") {
+        return NextResponse.json<ApiResponse<null>>({ data: null, error: "VOTING_TEMPORARILY_UNAVAILABLE" }, { status: 503 })
       }
     }
     return NextResponse.json<ApiResponse<null>>({ data: null, error: "SERVER_ERROR" }, { status: 500 })

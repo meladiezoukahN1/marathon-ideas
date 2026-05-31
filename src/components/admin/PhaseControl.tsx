@@ -11,7 +11,6 @@ function formatCountdown(seconds: number): string {
 const NEXT_PHASE: Record<string, string> = {
   WAITING: "PRESENTING",
   PRESENTING: "VOTING",
-  VOTING: "RESULT",
   RESULT: "FINISHED",
 }
 
@@ -30,24 +29,30 @@ export function PhaseControl({
 }) {
   const [countdown, setCountdown] = useState(0)
 
-  const canAdvance = challenge.phase === "WAITING" ||
-    challenge.phase === "VOTING" ||
-    challenge.phase === "RESULT"
+  const canAdvance = challenge.phase === "WAITING" || challenge.phase === "RESULT"
 
-  // Don't show next-phase button for PRESENTING → VOTING transition;
-  // admin uses the explicit "بدء التصويت" button in the main dashboard instead.
-  const showNextPhase = challenge.phase !== "PRESENTING"
+  // Don't show next-phase button for PRESENTING → VOTING transition or VOTING → RESULT;
+  // admin uses the explicit "بدء التصويت" button and "اعتماد النتيجة المحسوبة" buttons instead.
+  const showNextPhase = challenge.phase !== "PRESENTING" && challenge.phase !== "VOTING"
 
   const nextPhase = NEXT_PHASE[challenge.phase]
 
   useEffect(() => {
-    if (challenge.phase !== "VOTING" || !challenge.votingEndsAt) return
-    const iv = setInterval(() => {
-      const remaining = Math.floor((new Date(challenge.votingEndsAt!).getTime() - Date.now()) / 1000)
-      setCountdown(Math.max(0, remaining))
-    }, 1000)
+    function remaining(): number {
+      const status = challenge.votingTimerStatus
+      if (status === "PAUSED" && challenge.votingEndsAt && challenge.votingTimerPausedAt) {
+        return Math.max(0, Math.floor((new Date(challenge.votingEndsAt).getTime() - new Date(challenge.votingTimerPausedAt).getTime()) / 1000))
+      }
+      if (status === "FINISHED") return 0
+      if (status === "RUNNING" && challenge.votingEndsAt) {
+        return Math.max(0, Math.floor((new Date(challenge.votingEndsAt).getTime() - Date.now()) / 1000))
+      }
+      return challenge.votingDurationSeconds
+    }
+    setCountdown(remaining())
+    const iv = setInterval(() => { setCountdown(remaining()) }, 1000)
     return () => clearInterval(iv)
-  }, [challenge.phase, challenge.votingEndsAt])
+  }, [challenge.phase, challenge.votingEndsAt, challenge.votingTimerStatus, challenge.votingTimerPausedAt, challenge.votingDurationSeconds])
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-4">
@@ -64,7 +69,6 @@ export function PhaseControl({
               onClick={() => onPhase(nextPhase)}
               disabled={isLoading || !canAdvance}
               className={`px-3 py-1.5 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition ${
-                nextPhase === "RESULT" ? "bg-purple-100 text-purple-700 hover:bg-purple-200" :
                 nextPhase === "FINISHED" ? "bg-gray-100 text-gray-600 hover:bg-gray-200" :
                 "bg-blue-100 text-blue-700 hover:bg-blue-200"
               }`}
@@ -83,20 +87,28 @@ export function PhaseControl({
               {formatCountdown(countdown)}
             </p>
           </div>
-          <button
-            onClick={onCalculateResult}
-            disabled={isLoading}
-            className="w-full px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-50 hover:bg-indigo-700 transition"
-          >
-            اعتماد النتيجة المحسوبة
-          </button>
-          <button
-            onClick={onReveal}
-            disabled={isLoading}
-            className="w-full px-3 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold disabled:opacity-50 hover:bg-purple-700 transition"
-          >
-            عرض النتيجة على الشاشة
-          </button>
+          {!challenge.winnerId ? (
+            <button
+              onClick={onCalculateResult}
+              disabled={isLoading}
+              className="w-full px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-50 hover:bg-indigo-700 transition"
+            >
+              اعتماد النتيجة المحسوبة
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+                <p className="text-emerald-800 font-bold">✓ تم حساب النتيجة</p>
+              </div>
+              <button
+                onClick={onReveal}
+                disabled={isLoading}
+                className="w-full px-3 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold disabled:opacity-50 hover:bg-purple-700 transition"
+              >
+                عرض النتيجة على الشاشة
+              </button>
+            </div>
+          )}
         </div>
       )}
 

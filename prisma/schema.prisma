@@ -57,6 +57,8 @@ model Challenge {
   votingEndsAt         DateTime?
   votingDurationSeconds Int     @default(120)
   votingSessionId      String?
+  votingTimerStatus    String   @default("READY")
+  votingTimerPausedAt  DateTime?
   winnerId             String?
 
   team1FinalScore  Float?

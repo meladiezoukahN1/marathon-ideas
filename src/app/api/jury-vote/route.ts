@@ -3,8 +3,6 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { submitJuryVote } from "@/server/modules/voting/service"
 import { finalizeExpiredVotingIfNeeded } from "@/server/modules/matches/service"
-import { getVoteCounts } from "@/lib/actions/challenge.actions"
-import { emitToChallenge } from "@/lib/socket"
 import { juryVoteSchema } from "@/lib/validators"
 import type { ApiResponse } from "@/types/domain.types"
 
@@ -25,10 +23,6 @@ export async function POST(req: NextRequest) {
 
     await submitJuryVote(challengeId, teamId, session.user.id)
 
-    const counts = await getVoteCounts(challengeId)
-    emitToChallenge(challengeId, "vote:count", counts)
-    emitToChallenge(challengeId, "jury:voted", { challengeId, juryCount: counts.juryCount })
-
     return NextResponse.json<ApiResponse<{ success: true }>>({ data: { success: true }, error: null })
   } catch (err: unknown) {
     if (err instanceof Error) {
@@ -43,6 +37,9 @@ export async function POST(req: NextRequest) {
       }
       if (err.message === "VOTING_CLOSED") {
         return NextResponse.json<ApiResponse<null>>({ data: null, error: "VOTING_CLOSED" }, { status: 400 })
+      }
+      if (err.message === "VOTING_TEMPORARILY_UNAVAILABLE") {
+        return NextResponse.json<ApiResponse<null>>({ data: null, error: "VOTING_TEMPORARILY_UNAVAILABLE" }, { status: 503 })
       }
     }
     return NextResponse.json<ApiResponse<null>>({ data: null, error: "SERVER_ERROR" }, { status: 500 })

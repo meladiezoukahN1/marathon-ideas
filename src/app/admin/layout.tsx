@@ -3,6 +3,14 @@ import { redirect } from "next/navigation"
 import { authOptions } from "@/lib/auth"
 import { AdminNav } from "@/components/admin/AdminNav"
 import type { ReactNode } from "react"
+import { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "ماراثون الأفكار - إدارة المسؤولين",
+  description: "إدارة المسؤولين للماراثون",
+}
+
+
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const session = await getServerSession(authOptions)
   if (!session) redirect("/login")

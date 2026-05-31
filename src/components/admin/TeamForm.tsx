@@ -20,6 +20,7 @@ export function TeamForm({
   const [idea, setIdea]         = useState(initial?.idea ?? "")
   const [members, setMembers]   = useState(initial?.members ?? "")
   const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? "")
+  const [imageDeleted, setImageDeleted] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving]       = useState(false)
   const [error, setError]         = useState("")
@@ -36,6 +37,7 @@ export function TeamForm({
       const json = await res.json()
       if (json.data?.url) {
         setImageUrl(json.data.url)
+        setImageDeleted(false)
       } else {
         setError(json.error || "فشل رفع الصورة")
       }
@@ -53,12 +55,15 @@ export function TeamForm({
     setSaving(true)
     setError("")
     try {
-      const payload = {
-        name,
-        idea,
-        members: members || undefined,
-        imageUrl: imageUrl || undefined,
+      const payload: Record<string, unknown> = { name, idea }
+      if (members) payload.members = members
+
+      if (imageDeleted) {
+        payload.imageUrl = null
+      } else if (imageUrl && imageUrl !== initial?.imageUrl) {
+        payload.imageUrl = imageUrl
       }
+
       if (initial) {
         const res = await fetch(`/api/teams/${initial.id}`, {
           method: "PATCH",
@@ -94,7 +99,7 @@ export function TeamForm({
           </span>
         </label>
         {imageUrl && (
-          <button onClick={() => setImageUrl("")} className="text-xs text-red-500 hover:underline">حذف الصورة</button>
+          <button onClick={() => { setImageUrl(""); setImageDeleted(true); }} className="text-xs text-red-500 hover:underline">حذف الصورة</button>
         )}
       </div>
 

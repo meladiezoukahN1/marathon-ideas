@@ -14,6 +14,7 @@ import type { ChallengePublic } from "@/types/domain.types"
 
 const EVENT_ID = process.env.NEXT_PUBLIC_EVENT_ID ?? "event-001"
 
+
 export default function ChallengesPage() {
   const [challenges, setChallenges] = useState<ChallengePublic[]>([])
   const [loading, setLoading]       = useState(true)

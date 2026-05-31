@@ -30,6 +30,8 @@ export interface AdminMatchListItem {
   votingEndsAt: string | null
   votingDurationSeconds: number
   votingSessionId: string | null
+  votingTimerStatus: string
+  votingTimerPausedAt: string | null
   team1FinalScore: number | null
   team2FinalScore: number | null
   team1PublicPct: number | null
@@ -50,6 +52,9 @@ export interface PublicActiveMatch {
   winnerId: string | null
   votingEndsAt: string | null
   votingSessionId: string | null
+  votingTimerStatus: string
+  votingTimerPausedAt: string | null
+  votingDurationSeconds: number
   team1: { id: string; name: string; imageUrl: string | null } | null
   team2: { id: string; name: string; imageUrl: string | null } | null
   team1Timer: TimerState
@@ -79,4 +84,27 @@ export interface MatchResult {
 export interface CurrentUser {
   id: string
   role: "SUPERADMIN" | "ADMIN" | "JURY"
+}
+
+export interface VoteAuditEntry {
+  id: string
+  matchId: string
+  teamId: string
+  teamName: string
+  voterIdentifier: string | null
+  votingSessionId: string | null
+  voteType: "PUBLIC" | "JURY"
+  createdAt: string
+}
+
+export interface PaginationMeta {
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
+export interface VoteAuditResponse {
+  data: VoteAuditEntry[]
+  pagination: PaginationMeta
 }

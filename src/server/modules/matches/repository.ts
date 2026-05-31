@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { cleanupRedisVoteKeys } from "@/server/modules/voting/service"
 import type { TimerStatus, TeamSlot } from "./types"
 
 const TIMER_FIELDS = {
@@ -27,6 +28,8 @@ const MATCH_SELECT = {
   votingEndsAt: true,
   votingDurationSeconds: true,
   votingSessionId: true,
+  votingTimerStatus: true,
+  votingTimerPausedAt: true,
   team1FinalScore: true,
   team2FinalScore: true,
   team1PublicPct: true,
@@ -68,6 +71,156 @@ function mapTimer(
   }
 }
 
+function maskToken(token: string): string {
+  if (token.length <= 10) return token.slice(0, 3) + "..."
+  return token.slice(0, 6) + "..." + token.slice(-4)
+}
+
+export async function getMatchVoteAudit(
+  matchId: string,
+  options: {
+    teamId?: string
+    voteType?: "PUBLIC" | "JURY" | "ALL"
+    search?: string
+    page: number
+    pageSize: number
+  },
+) {
+  const { teamId, voteType = "ALL", search, page, pageSize } = options
+  const skip = (page - 1) * pageSize
+
+  const baseWhere: Record<string, unknown> = { challengeId: matchId }
+  if (teamId) baseWhere.teamId = teamId
+
+  if (voteType === "PUBLIC") {
+    const where = { ...baseWhere }
+    const [rows, total] = await Promise.all([
+      prisma.publicVote.findMany({
+        where,
+        select: { id: true, challengeId: true, teamId: true, voterToken: true, votingSessionId: true, createdAt: true, team: { select: { name: true } } },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: pageSize,
+      }),
+      prisma.publicVote.count({ where }),
+    ])
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        matchId: r.challengeId,
+        teamId: r.teamId,
+        teamName: r.team.name,
+        voterIdentifier: maskToken(r.voterToken),
+        votingSessionId: r.votingSessionId,
+        voteType: "PUBLIC" as const,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    }
+  }
+
+  const juryWhere: Record<string, unknown> = { ...baseWhere }
+  if (search) {
+    juryWhere.juror = { username: { contains: search } }
+  }
+
+  if (voteType === "JURY") {
+    const [rows, total] = await Promise.all([
+      prisma.juryVote.findMany({
+        where: juryWhere,
+        select: { id: true, challengeId: true, teamId: true, jurorId: true, votingSessionId: true, createdAt: true, team: { select: { name: true } }, juror: { select: { username: true } } },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: pageSize,
+      }),
+      prisma.juryVote.count({ where: juryWhere }),
+    ])
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        matchId: r.challengeId,
+        teamId: r.teamId,
+        teamName: r.team.name,
+        voterIdentifier: r.juror.username,
+        votingSessionId: r.votingSessionId,
+        voteType: "JURY" as const,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    }
+  }
+
+  // ALL: merge both vote types, sorted by createdAt desc, then paginate
+  const OVERFETCH_LIMIT = 5000
+  const [publicRows, juryRows, publicTotal, juryTotal] = await Promise.all([
+    prisma.publicVote.findMany({
+      where: baseWhere,
+      select: { id: true, challengeId: true, teamId: true, voterToken: true, votingSessionId: true, createdAt: true, team: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: OVERFETCH_LIMIT,
+    }),
+    prisma.juryVote.findMany({
+      where: juryWhere,
+      select: { id: true, challengeId: true, teamId: true, jurorId: true, votingSessionId: true, createdAt: true, team: { select: { name: true } }, juror: { select: { username: true } } },
+      orderBy: { createdAt: "desc" },
+      take: OVERFETCH_LIMIT,
+    }),
+    prisma.publicVote.count({ where: baseWhere }),
+    prisma.juryVote.count({ where: juryWhere }),
+  ])
+
+  const total = publicTotal + juryTotal
+  const merged: Array<{
+    id: string
+    challengeId: string
+    teamId: string
+    teamName: string
+    voterIdentifier: string
+    votingSessionId: string | null
+    voteType: "PUBLIC" | "JURY"
+    createdAt: Date
+  }> = [
+    ...publicRows.map((r) => ({
+      id: r.id,
+      challengeId: r.challengeId,
+      teamId: r.teamId,
+      teamName: r.team.name,
+      voterIdentifier: maskToken(r.voterToken),
+      votingSessionId: r.votingSessionId,
+      voteType: "PUBLIC" as const,
+      createdAt: r.createdAt,
+    })),
+    ...juryRows.map((r) => ({
+      id: r.id,
+      challengeId: r.challengeId,
+      teamId: r.teamId,
+      teamName: r.team.name,
+      voterIdentifier: r.juror.username,
+      votingSessionId: r.votingSessionId,
+      voteType: "JURY" as const,
+      createdAt: r.createdAt,
+    })),
+  ]
+
+  merged.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+
+  const paged = merged.slice(skip, skip + pageSize)
+
+  return {
+    data: paged.map((r) => ({
+      id: r.id,
+      matchId: r.challengeId,
+      teamId: r.teamId,
+      teamName: r.teamName,
+      voterIdentifier: r.voterIdentifier,
+      votingSessionId: r.votingSessionId,
+      voteType: r.voteType,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+  }
+}
+
 export async function getMatchesForAdmin(eventId: string) {
   const rows = await prisma.challenge.findMany({
     where: { eventId },
@@ -87,6 +240,8 @@ export async function getMatchesForAdmin(eventId: string) {
     votingStartedAt: r.votingStartedAt?.toISOString() ?? null,
     votingEndsAt: r.votingEndsAt?.toISOString() ?? null,
     votingDurationSeconds: r.votingDurationSeconds,
+    votingTimerStatus: r.votingTimerStatus,
+    votingTimerPausedAt: r.votingTimerPausedAt?.toISOString() ?? null,
     team1FinalScore: r.team1FinalScore,
     team2FinalScore: r.team2FinalScore,
     team1PublicPct: r.team1PublicPct,
@@ -119,6 +274,8 @@ export async function getMatchById(matchId: string) {
     votingEndsAt: row.votingEndsAt?.toISOString() ?? null,
     votingDurationSeconds: row.votingDurationSeconds,
     votingSessionId: row.votingSessionId,
+    votingTimerStatus: row.votingTimerStatus,
+    votingTimerPausedAt: row.votingTimerPausedAt?.toISOString() ?? null,
     team1FinalScore: row.team1FinalScore,
     team2FinalScore: row.team2FinalScore,
     team1PublicPct: row.team1PublicPct,
@@ -264,8 +421,9 @@ export async function storeResult(
     where: { id: matchId },
     data: {
       winnerId: result.winnerId,
-      phase: "RESULT",
       voteCloseAt: new Date(),
+      votingTimerStatus: "FINISHED",
+      votingTimerPausedAt: null,
       team1FinalScore: result.team1FinalScore,
       team2FinalScore: result.team2FinalScore,
       team1PublicPct: result.team1PublicPct,
@@ -346,11 +504,17 @@ export async function resetMatch(matchId: string) {
     where: { id: matchId },
     select: {
       eventId: true,
+      votingStartedAt: true,
       team1TimerDurationSeconds: true,
       team2TimerDurationSeconds: true,
     },
   })
   if (!challenge) throw new Error("MATCH_NOT_FOUND")
+
+  // Clean up Redis keys for this challenge's current session
+  if (challenge.votingStartedAt) {
+    void cleanupRedisVoteKeys(matchId, challenge.votingStartedAt.toISOString())
+  }
 
   await prisma.$transaction([
     prisma.publicVote.deleteMany({ where: { challengeId: matchId } }),
@@ -366,6 +530,8 @@ export async function resetMatch(matchId: string) {
         votingStartedAt: null,
         votingEndsAt: null,
         votingSessionId: null,
+        votingTimerStatus: "READY",
+        votingTimerPausedAt: null,
         team1FinalScore: null,
         team2FinalScore: null,
         team1PublicPct: null,
@@ -412,11 +578,19 @@ export async function resetAllChallenges(eventId: string) {
     where: { eventId },
     select: {
       id: true,
+      votingStartedAt: true,
       team1TimerDurationSeconds: true,
       team2TimerDurationSeconds: true,
     },
   })
   if (challenges.length === 0) return 0
+
+  // Clean up Redis keys for all challenges
+  for (const c of challenges) {
+    if (c.votingStartedAt) {
+      void cleanupRedisVoteKeys(c.id, c.votingStartedAt.toISOString())
+    }
+  }
 
   await prisma.$transaction([
     prisma.publicVote.deleteMany({ where: { challenge: { eventId } } }),
@@ -433,6 +607,8 @@ export async function resetAllChallenges(eventId: string) {
           votingStartedAt: null,
           votingEndsAt: null,
           votingSessionId: null,
+          votingTimerStatus: "READY",
+          votingTimerPausedAt: null,
           team1FinalScore: null,
           team2FinalScore: null,
           team1PublicPct: null,

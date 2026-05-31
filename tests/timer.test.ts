@@ -40,6 +40,8 @@ function makeMatch(team1Overrides: Partial<TimerState> = {}, team2Overrides: Par
     votingEndsAt: null,
     votingDurationSeconds: 120,
     votingSessionId: null,
+    votingTimerStatus: "READY",
+    votingTimerPausedAt: null,
     team1FinalScore: null,
     team2FinalScore: null,
     team1PublicPct: null,

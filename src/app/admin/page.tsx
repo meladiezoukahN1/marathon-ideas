@@ -4,8 +4,10 @@ export const dynamic = "force-dynamic"
 import { useCallback, useEffect, useState } from "react"
 import toast from "react-hot-toast"
 import { TimerControl } from "@/components/admin/TimerControl"
+import { VotingTimerControl } from "@/components/admin/VotingTimerControl"
 import { PhaseControl } from "@/components/admin/PhaseControl"
 import { VoteMonitor } from "@/components/admin/VoteMonitor"
+import { VoteAuditViewer } from "@/components/admin/VoteAuditViewer"
 import { Badge } from "@/components/ui/Badge"
 import { CardSkeleton } from "@/components/ui/Skeleton"
 import { getChallengePhaseLabel } from "@/lib/labels"
@@ -59,6 +61,20 @@ async function getVoteCounts(matchId: string) {
 
 async function resetMatchRequest(matchId: string) {
   const res = await fetch(`/api/admin/matches/${matchId}/reset`, { method: "POST" })
+  const json = await res.json()
+  if (json.error) throw new Error(json.error)
+  return json
+}
+
+async function votingTimerPost(matchId: string, action: string, payload?: object) {
+  const path = action === "patch"
+    ? `/api/admin/matches/${matchId}/voting-timer`
+    : `/api/admin/matches/${matchId}/voting-timer/${action}`
+  const res = await fetch(path, {
+    method: action === "patch" ? "PATCH" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: payload ? JSON.stringify(payload) : undefined,
+  })
   const json = await res.json()
   if (json.error) throw new Error(json.error)
   return json
@@ -162,10 +178,9 @@ export default function AdminDashboard() {
     setActing(true)
     try {
       const result = await calculateResult(challenge.id)
+      // Do NOT change phase here — calculation ≠ reveal
       setChallenges(p => p.map(c => c.id === challenge.id ? {
         ...c,
-        phase: "RESULT",
-        status: "ACTIVE",
         winnerId: result.winnerId,
         team1FinalScore: result.team1FinalScore,
         team2FinalScore: result.team2FinalScore,
@@ -183,14 +198,29 @@ export default function AdminDashboard() {
     setActing(false)
   }, [challenge])
 
+  async function revealResult(matchId: string) {
+    const res = await fetch(`/api/admin/matches/${matchId}/reveal`, { method: "POST" })
+    const json = await res.json()
+    if (json.error) throw new Error(json.error)
+    return json
+  }
+
   const handleReveal = useCallback(async () => {
     if (!challenge) return
     if (!challenge.winnerId) {
       toast.error("يجب حساب النتيجة أولاً")
       return
     }
-    window.open("/display", "_blank")
-    toast.success("تم فتح شاشة العرض")
+    setActing(true)
+    try {
+      await revealResult(challenge.id)
+      setChallenges(p => p.map(c => c.id === challenge.id ? { ...c, phase: "RESULT" as ChallengePublic["phase"] } : c))
+      toast.success("تم عرض النتيجة للجمهور!")
+      load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فشل عرض النتيجة")
+    }
+    setActing(false)
   }, [challenge])
 
   const currentlyActiveChallenge = challenges.find(c => c.phase === "PRESENTING" || c.phase === "VOTING" || c.phase === "RESULT")
@@ -205,6 +235,19 @@ export default function AdminDashboard() {
       load()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "فشل تعيين المباراة النشطة")
+    }
+    setActing(false)
+  }, [challenge])
+
+  const handleVotingTimerAction = useCallback(async (action: string, payload?: object) => {
+    if (!challenge) return
+    setActing(true)
+    try {
+      await votingTimerPost(challenge.id, action, payload)
+      toast.success("تم تحديث مؤقت التصويت")
+      load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "فشل تعديل مؤقت التصويت")
     }
     setActing(false)
   }, [challenge])
@@ -407,7 +450,29 @@ export default function AdminDashboard() {
             />
           </div>
 
+          {(challenge.phase === "VOTING" || challenge.phase === "FINISHED" || challenge.phase === "RESULT") && (
+            <div className={challenge.phase === "VOTING" ? "md:w-1/2" : ""}>
+              <VotingTimerControl
+                votingTimerStatus={challenge.votingTimerStatus}
+                votingEndsAt={challenge.votingEndsAt}
+                votingTimerPausedAt={challenge.votingTimerPausedAt}
+                votingDurationSeconds={challenge.votingDurationSeconds}
+                onPause={() => handleVotingTimerAction("pause")}
+                onResume={() => handleVotingTimerAction("resume")}
+                onReset={() => handleVotingTimerAction("reset")}
+                onAdd={(s) => handleVotingTimerAction("patch", { deltaSeconds: s })}
+                onSubtract={(s) => handleVotingTimerAction("patch", { deltaSeconds: -s })}
+                onSet={(s) => handleVotingTimerAction("patch", { remainingSeconds: s })}
+                disabled={acting}
+              />
+            </div>
+          )}
+
           <VoteMonitor challenge={challenge} counts={voteCounts} />
+
+          {(challenge.phase === "VOTING" || challenge.phase === "RESULT" || challenge.phase === "FINISHED") && (
+            <VoteAuditViewer challenge={challenge} />
+          )}
 
           {/* Dangerous actions */}
           <div className="bg-red-50 border border-red-200 rounded-2xl p-4 space-y-3">

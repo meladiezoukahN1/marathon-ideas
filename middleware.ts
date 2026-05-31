@@ -20,8 +20,9 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const pathname = request.nextUrl.pathname;
   const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
   const isJuryPath = pathname === "/jury" || pathname.startsWith("/jury/");
+  const isDisplayPath = pathname === "/display" || pathname.startsWith("/display/");
 
-  if (!isAdminPath && !isJuryPath) {
+  if (!isAdminPath && !isJuryPath && !isDisplayPath) {
     return NextResponse.next();
   }
 
@@ -30,6 +31,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   if (!token) {
     if (isAdminPath) {
       return buildLoginRedirect(request, "/admin");
+    }
+
+    if (isDisplayPath) {
+      return buildLoginRedirect(request, "/display");
     }
 
     return buildLoginRedirect(request, "/jury");
@@ -45,9 +50,13 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
+  if (isDisplayPath && !isAdminRole(role)) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/jury/:path*"],
+  matcher: ["/admin/:path*", "/display/:path*", "/jury/:path*"],
 };

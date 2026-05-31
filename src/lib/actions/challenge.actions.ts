@@ -11,7 +11,7 @@ const TEAM_SELECT = {
 const CHALLENGE_SELECT = {
   id: true, name: true, description: true, slug: true, order: true,
   status: true, phase: true, timerSecs: true, timerActive: true,
-  voteOpenAt: true, voteCloseAt: true, votingStartedAt: true, votingEndsAt: true, votingDurationSeconds: true, votingSessionId: true, winnerId: true,
+  voteOpenAt: true, voteCloseAt: true, votingStartedAt: true, votingEndsAt: true, votingDurationSeconds: true, votingSessionId: true, votingTimerStatus: true, votingTimerPausedAt: true, winnerId: true,
   teams: { select: TEAM_SELECT },
 } as const
 
@@ -21,6 +21,8 @@ function mapChallenge(c: {
   status: string; phase: string; timerSecs: number; timerActive: boolean
   voteOpenAt: Date | null; voteCloseAt: Date | null; votingStartedAt: Date | null; votingEndsAt: Date | null; votingDurationSeconds: number
   votingSessionId: string | null
+  votingTimerStatus: string
+  votingTimerPausedAt: Date | null
   winnerId: string | null
   teams: { id: string; name: string; idea: string; members: string | null; imageUrl: string | null; slot: string }[]
 }): ChallengePublic {
@@ -34,6 +36,8 @@ function mapChallenge(c: {
     votingEndsAt: c.votingEndsAt?.toISOString() ?? null,
     votingDurationSeconds: c.votingDurationSeconds,
     votingSessionId: c.votingSessionId,
+    votingTimerStatus: c.votingTimerStatus,
+    votingTimerPausedAt: c.votingTimerPausedAt?.toISOString() ?? null,
     team1FinalScore: null,
     team2FinalScore: null,
     team1PublicPct: null,

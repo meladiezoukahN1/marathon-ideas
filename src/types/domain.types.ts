@@ -41,6 +41,8 @@ export interface ChallengePublic {
   votingEndsAt: string | null
   votingDurationSeconds: number
   votingSessionId: string | null
+  votingTimerStatus: string
+  votingTimerPausedAt: string | null
   winnerId: string | null
   team1FinalScore: number | null
   team2FinalScore: number | null
