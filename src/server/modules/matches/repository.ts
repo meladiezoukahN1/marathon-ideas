@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma"
-import { cleanupRedisVoteKeys } from "@/server/modules/voting/service"
 import type { TimerStatus, TeamSlot } from "./types"
 
 const TIMER_FIELDS = {
@@ -511,11 +510,6 @@ export async function resetMatch(matchId: string) {
   })
   if (!challenge) throw new Error("MATCH_NOT_FOUND")
 
-  // Clean up Redis keys for this challenge's current session
-  if (challenge.votingStartedAt) {
-    void cleanupRedisVoteKeys(matchId, challenge.votingStartedAt.toISOString())
-  }
-
   await prisma.$transaction([
     prisma.publicVote.deleteMany({ where: { challengeId: matchId } }),
     prisma.juryVote.deleteMany({ where: { challengeId: matchId } }),
@@ -584,13 +578,6 @@ export async function resetAllChallenges(eventId: string) {
     },
   })
   if (challenges.length === 0) return 0
-
-  // Clean up Redis keys for all challenges
-  for (const c of challenges) {
-    if (c.votingStartedAt) {
-      void cleanupRedisVoteKeys(c.id, c.votingStartedAt.toISOString())
-    }
-  }
 
   await prisma.$transaction([
     prisma.publicVote.deleteMany({ where: { challenge: { eventId } } }),

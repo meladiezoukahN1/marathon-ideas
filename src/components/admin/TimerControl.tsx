@@ -31,6 +31,21 @@ function TimerPanel({
   const isRunning = live.status === "RUNNING"
   const isFinished = live.status === "FINISHED"
 
+  React.useEffect(() => {
+    console.log("[ADMIN_TIMER_RENDER_VALUE]", JSON.stringify({
+      team: label,
+      displayedRemaining: live.remainingSeconds,
+      displayedValue: live.display,
+      displayedStatus: live.status,
+      dbTimerStatus: timer.status,
+      dbTimerRemainingSeconds: timer.remainingSeconds,
+      dbTimerDurationSeconds: timer.durationSeconds,
+      dbTimerStartedAt: timer.startedAt,
+      calculatedElapsed: timer.startedAt && timer.status === "RUNNING" ? Math.floor((Date.now() - new Date(timer.startedAt).getTime()) / 1000) : null,
+      derived: "from useLiveTimer (remainingSeconds - elapsed)",
+    }))
+  }, [timer, live])
+
   const handleSet = useCallback(() => {
     const val = parseInt(inputValue, 10)
     if (!isNaN(val) && val >= 0) {

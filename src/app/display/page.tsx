@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { PublicActiveMatch } from "@/server/modules/matches/types"
 import type { TimerState } from "@/types/domain.types"
+import type { TimerSnapshot } from "@/lib/timer-snapshot"
 import { TeamAvatar } from "@/components/common/team-avatar"
 import { getTimerStatusLabel } from "@/lib/labels"
 
@@ -18,41 +19,6 @@ function formatTime(seconds: number): string {
   return `${m}:${s}`
 }
 
-function useLiveTimer(backendTimer: TimerState): { live: number; status: string } {
-  const [live, setLive] = useState(backendTimer.remainingSeconds)
-  const syncRef = useRef({
-    base: backendTimer.remainingSeconds,
-    syncedAt: Date.now(),
-    status: backendTimer.status,
-  })
-
-  useEffect(() => {
-    syncRef.current = {
-      base: backendTimer.remainingSeconds,
-      syncedAt: Date.now(),
-      status: backendTimer.status,
-    }
-
-    setLive(backendTimer.remainingSeconds)
-  }, [backendTimer.remainingSeconds, backendTimer.status, backendTimer.startedAt])
-
-  useEffect(() => {
-    if (backendTimer.status !== "RUNNING") return
-
-    const interval = setInterval(() => {
-      const current = syncRef.current
-      const elapsed = Math.floor((Date.now() - current.syncedAt) / 1000)
-      setLive(Math.max(0, current.base - elapsed))
-    }, 200)
-
-    return () => clearInterval(interval)
-  }, [backendTimer.status])
-
-  const status =
-    backendTimer.status === "RUNNING" && live <= 0 ? "FINISHED" : backendTimer.status
-
-  return { live, status }
-}
 
 const pageShellClass =
   "relative min-h-screen overflow-hidden text-slate-900 flex flex-col"
@@ -71,6 +37,7 @@ type PresentingTeam = {
   name: string
   imageUrl?: string | null
   timer: TimerState
+  snapshot: TimerSnapshot
 }
 
 type PresentationViewMode =
@@ -106,25 +73,36 @@ function StatusScreen({
   )
 }
 
-function isRunningOrPaused(timer: TimerState): boolean {
-  return timer.status === "RUNNING" || timer.status === "PAUSED"
+function isTimerActive(snap: TimerSnapshot): boolean {
+  return snap.status === "RUNNING" || snap.status === "PAUSED" || snap.status === "SCHEDULED"
 }
 
-function isFinished(timer: TimerState): boolean {
-  return timer.status === "FINISHED"
+function isTimerEnded(snap: TimerSnapshot): boolean {
+  return snap.status === "ENDED"
 }
 
 function getPresentationViewMode(match: PublicActiveMatch): PresentationViewMode {
-  const team1Active = isRunningOrPaused(match.team1Timer)
-  const team2Active = isRunningOrPaused(match.team2Timer)
-  const team1Finished = isFinished(match.team1Timer)
-  const team2Finished = isFinished(match.team2Timer)
+  const active = match.activePresentationTeam
 
-  if (team1Active) return "TEAM1_PRESENTING"
-  if (team2Active) return "TEAM2_PRESENTING"
+  if (active === "TEAM1") return "TEAM1_PRESENTING"
+  if (active === "TEAM2") return "TEAM2_PRESENTING"
 
-  if (team1Finished && team2Finished) return "BOTH_AFTER_PRESENTATIONS"
-  if (team1Finished && !team2Finished) return "BOTH_BEFORE_TEAM2"
+  const t1Active = isTimerActive(match.team1TimerSnapshot)
+  const t2Active = isTimerActive(match.team2TimerSnapshot)
+  const t1Ended = isTimerEnded(match.team1TimerSnapshot)
+  const t2Ended = isTimerEnded(match.team2TimerSnapshot)
+
+  if (active === "VOTING" || active === "RESULT" || active === "WAITING") {
+    if (t1Ended && t2Ended) return "BOTH_AFTER_PRESENTATIONS"
+    if (t1Ended && !t2Ended) return "BOTH_BEFORE_TEAM2"
+    return "BOTH_BEFORE_START"
+  }
+
+  if (t1Active) return "TEAM1_PRESENTING"
+  if (t2Active) return "TEAM2_PRESENTING"
+
+  if (t1Ended && t2Ended) return "BOTH_AFTER_PRESENTATIONS"
+  if (t1Ended && !t2Ended) return "BOTH_BEFORE_TEAM2"
 
   return "BOTH_BEFORE_START"
 }
@@ -138,6 +116,7 @@ function getPresentingTeam(match: PublicActiveMatch): PresentingTeam | null {
       name: match.team1?.name ?? "الفريق الأول",
       imageUrl: match.team1?.imageUrl,
       timer: match.team1Timer,
+      snapshot: match.team1TimerSnapshot,
     }
   }
 
@@ -147,6 +126,7 @@ function getPresentingTeam(match: PublicActiveMatch): PresentingTeam | null {
       name: match.team2?.name ?? "الفريق الثاني",
       imageUrl: match.team2?.imageUrl,
       timer: match.team2Timer,
+      snapshot: match.team2TimerSnapshot,
     }
   }
 
@@ -248,17 +228,59 @@ function TeamsTogetherView({
   )
 }
 
+function ScheduleCountdown({ startsAt }: { startsAt: string }) {
+  const target = new Date(startsAt).getTime()
+  const calc = useCallback(
+    () => Math.max(0, Math.ceil((target - Date.now()) / 1000)),
+    [target],
+  )
+  const [remaining, setRemaining] = useState(calc)
+
+  useEffect(() => {
+    setRemaining(calc())
+    const iv = setInterval(() => setRemaining(calc()), 1000)
+    return () => clearInterval(iv)
+  }, [target, calc])
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="text-4xl sm:text-5xl md:text-6xl font-black text-amber-600">
+        {remaining}
+      </div>
+      <div className="text-xl sm:text-2xl font-black text-amber-700">
+        يبدأ خلال
+      </div>
+    </div>
+  )
+}
+
 function PresentingTeamCard({ team }: { team: PresentingTeam }) {
-  const { live, status } = useLiveTimer(team.timer)
+  const snap = team.snapshot
+  const remaining = snap.remainingSeconds
+  const status = snap.status
 
   const timerClass =
-    live <= 0
+    status === "ENDED" || remaining <= 0
       ? "border-rose-200 bg-rose-50 text-rose-600 shadow-rose-100"
       : status === "RUNNING"
         ? "border-emerald-200 bg-emerald-50 text-emerald-700 shadow-emerald-100 ring-2 ring-emerald-200"
-        : "border-amber-200 bg-amber-50 text-amber-700 shadow-amber-100 ring-2 ring-amber-200"
+        : status === "SCHEDULED"
+          ? "border-amber-200 bg-amber-50 text-amber-600 shadow-amber-100 ring-2 ring-amber-200"
+          : "border-amber-200 bg-amber-50 text-amber-700 shadow-amber-100 ring-2 ring-amber-200"
 
   const slotLabel = team.slot === "TEAM1" ? "الفريق الأول" : "الفريق الثاني"
+
+  console.log("[DISPLAY_TIMER_RENDER_VALUE]", JSON.stringify({
+    team: team.slot,
+    displayedRemaining: remaining,
+    displayedStatus: status,
+    snapshotRemainingSeconds: snap.remainingSeconds,
+    snapshotStatus: snap.status,
+    snapshotDurationSeconds: snap.durationSeconds,
+    snapshotStartedAt: snap.startedAt,
+    snapshotServerNow: snap.serverNow,
+    derived: "from snap.remainingSeconds directly",
+  }))
 
   return (
     <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-5 sm:px-6 sm:py-7 md:py-10">
@@ -267,11 +289,24 @@ function PresentingTeamCard({ team }: { team: PresentingTeam }) {
           يعرض الآن: {slotLabel}
         </div>
 
-        <div
-          className={`mx-auto w-fit rounded-[2rem] border px-7 py-4 font-mono text-6xl font-black leading-none shadow-xl sm:px-9 sm:py-5 sm:text-7xl md:text-8xl lg:text-9xl ${timerClass}`}
-        >
-          {formatTime(live)}
-        </div>
+        {status === "SCHEDULED" && snap.startsAt ? (
+          <ScheduleCountdown startsAt={snap.startsAt} />
+        ) : status === "PAUSED" ? (
+          <div className="flex flex-col items-center gap-2">
+            <div className="text-5xl sm:text-6xl md:text-7xl font-black text-amber-600">
+              {formatTime(remaining)}
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-amber-700">
+              متوقف
+            </div>
+          </div>
+        ) : (
+          <div
+            className={`mx-auto w-fit rounded-[2rem] border px-7 py-4 font-mono text-6xl font-black leading-none shadow-xl sm:px-9 sm:py-5 sm:text-7xl md:text-8xl lg:text-9xl ${timerClass}`}
+          >
+            {formatTime(remaining)}
+          </div>
+        )}
 
         <div className="mx-auto mt-7 w-fit rounded-[2rem] bg-amber-100/80 p-4 shadow-xl ring-2 ring-amber-300/50 sm:p-5 md:p-6">
           <div className="rounded-full bg-white p-2 shadow-lg ring-4 ring-white/90 sm:p-3">
@@ -283,9 +318,11 @@ function PresentingTeamCard({ team }: { team: PresentingTeam }) {
           {team.name}
         </h2>
 
-        <div className="mx-auto mt-5 w-fit rounded-full bg-slate-900 px-5 py-2 text-sm font-black text-white shadow-lg sm:px-6 sm:text-base">
-          {getTimerStatusLabel(status)}
-        </div>
+        {status !== "SCHEDULED" && (
+          <div className="mx-auto mt-5 w-fit rounded-full bg-slate-900 px-5 py-2 text-sm font-black text-white shadow-lg sm:px-6 sm:text-base">
+            {getTimerStatusLabel(status)}
+          </div>
+        )}
       </section>
     </main>
   )
@@ -331,48 +368,9 @@ function PresentationPhase({ match }: { match: PublicActiveMatch }) {
 function VotingPhase({ match }: { match: PublicActiveMatch }) {
   const appUrl = typeof window !== "undefined" ? window.location.origin : ""
   const voteUrl = `${appUrl}/vote`
-  const [countdown, setCountdown] = useState(0)
-
-  useEffect(() => {
-    function remaining(): number {
-      const status = match.votingTimerStatus
-
-      if (status === "PAUSED" && match.votingEndsAt && match.votingTimerPausedAt) {
-        return Math.max(
-          0,
-          Math.floor(
-            (new Date(match.votingEndsAt).getTime() -
-              new Date(match.votingTimerPausedAt).getTime()) /
-              1000,
-          ),
-        )
-      }
-
-      if (status === "FINISHED") return 0
-
-      if (status === "RUNNING" && match.votingEndsAt) {
-        return Math.max(
-          0,
-          Math.floor((new Date(match.votingEndsAt).getTime() - Date.now()) / 1000),
-        )
-      }
-
-      return match.votingDurationSeconds
-    }
-
-    setCountdown(remaining())
-
-    const interval = setInterval(() => {
-      setCountdown(remaining())
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [
-    match.votingEndsAt,
-    match.votingTimerStatus,
-    match.votingTimerPausedAt,
-    match.votingDurationSeconds,
-  ])
+  const snap = match.votingTimerSnapshot
+  const countdown = snap.remainingSeconds
+  const status = snap.status
 
   return (
     <main className="relative z-10 flex flex-1 flex-col items-center justify-center gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-7 md:gap-8 md:py-10">
@@ -382,17 +380,22 @@ function VotingPhase({ match }: { match: PublicActiveMatch }) {
         </h2>
       </section>
 
-      {match.votingEndsAt && (
-        <div
-          className={`rounded-[1.7rem] border px-7 py-4 font-mono text-5xl font-black leading-none shadow-xl sm:text-6xl md:text-7xl ${
-            countdown > 0
-              ? "border-amber-200 bg-amber-50 text-amber-600 shadow-amber-100 ring-2 ring-amber-200"
-              : "border-rose-200 bg-rose-50 text-rose-600 shadow-rose-100"
-          }`}
-        >
-          {formatCountdown(countdown)}
-        </div>
-      )}
+      <div
+        className={`rounded-[1.7rem] border px-7 py-4 font-mono text-5xl font-black leading-none shadow-xl sm:text-6xl md:text-7xl ${
+          countdown > 0
+            ? "border-amber-200 bg-amber-50 text-amber-600 shadow-amber-100 ring-2 ring-amber-200"
+            : "border-rose-200 bg-rose-50 text-rose-600 shadow-rose-100"
+        }`}
+      >
+        {status === "PAUSED" ? (
+          <div className="flex flex-col items-center gap-1">
+            <span>{formatCountdown(countdown)}</span>
+            <span className="text-base sm:text-lg font-black text-amber-700">متوقف</span>
+          </div>
+        ) : (
+          formatCountdown(countdown)
+        )}
+      </div>
 
       <div className="grid w-full max-w-6xl grid-cols-1 items-center gap-4 sm:gap-5 md:grid-cols-[1fr_auto_1fr] md:gap-8">
         <TeamIntroCard
@@ -435,13 +438,20 @@ function VotingPhase({ match }: { match: PublicActiveMatch }) {
 }
 
 function ResultPhase({ match }: { match: PublicActiveMatch }) {
-  const t1Score = (match as unknown as Record<string, number | null>)
-    .team1FinalScore ?? 0
-  const t2Score = (match as unknown as Record<string, number | null>)
-    .team2FinalScore ?? 0
+  const t1Score = match.team1FinalScore ?? 0
+  const t2Score = match.team2FinalScore ?? 0
   const winnerId = match.winnerId
   const t1IsWinner = winnerId === match.team1?.id
   const t2IsWinner = winnerId === match.team2?.id
+  const isTie = match.isTie ?? false
+  const tieReason = match.tieReason
+
+  let subtitle: string | null = null
+  if (isTie && tieReason === "NO_VOTES") {
+    subtitle = "لم يتم تسجيل أي تصويت، وتم اعتبار النتيجة تعادلاً."
+  } else if (isTie && tieReason === "EQUAL_SCORE") {
+    subtitle = "النتيجة متعادلة وتحتاج إلى كسر التعادل."
+  }
 
   return (
     <main className="relative z-10 flex flex-1 flex-col items-center justify-center gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-7 md:gap-8 md:py-10">
@@ -450,6 +460,14 @@ function ResultPhase({ match }: { match: PublicActiveMatch }) {
           النتيجة النهائية
         </h2>
       </section>
+
+      {subtitle && (
+        <section className="w-full max-w-2xl rounded-[1.7rem] border border-yellow-200 bg-yellow-50/90 px-6 py-4 text-center shadow-xl shadow-yellow-100/80 backdrop-blur-xl sm:px-8 sm:py-5">
+          <p className="text-xl font-bold leading-tight text-yellow-800 sm:text-2xl md:text-3xl">
+            {subtitle}
+          </p>
+        </section>
+      )}
 
       <div className="grid w-full max-w-6xl grid-cols-1 items-center gap-4 sm:gap-5 md:grid-cols-[1fr_auto_1fr] md:gap-8">
         <ResultTeamCard
@@ -541,8 +559,20 @@ export default function DisplayPage() {
 
   const fetchMatch = useCallback(async () => {
     try {
-      const res = await fetch("/api/public/active-match")
+      const res = await fetch("/api/public/active-match", { cache: "no-store" })
       const json = await res.json()
+
+      console.log("[PUBLIC_DISPLAY_POLL_TICK]", JSON.stringify({
+        timestamp: new Date().toISOString(),
+        responseStatus: res.status,
+        hasData: !!json.data,
+        hasError: !!json.error,
+        challengeId: json.data?.id,
+        activePresentationTeam: json.data?.activePresentationTeam,
+        team1Remaining: json.data?.team1TimerSnapshot?.remainingSeconds,
+        team2Remaining: json.data?.team2TimerSnapshot?.remainingSeconds,
+        serverNow: json.data?.serverNow,
+      }))
 
       if (json.error) {
         if (json.error === "NO_ACTIVE_MATCH") {
@@ -587,6 +617,16 @@ export default function DisplayPage() {
   if (!match) {
     return <StatusScreen title="لا توجد مباراة نشطة الآن" />
   }
+
+  console.log("[DISPLAY_TIMER_STATE]", JSON.stringify({
+    challengeId: match.id,
+    phase: match.phase,
+    activePresentationTeam: match.activePresentationTeam,
+    team1: { status: match.team1TimerSnapshot.status, remainingSeconds: match.team1TimerSnapshot.remainingSeconds },
+    team2: { status: match.team2TimerSnapshot.status, remainingSeconds: match.team2TimerSnapshot.remainingSeconds },
+    voting: { status: match.votingTimerSnapshot.status, remainingSeconds: match.votingTimerSnapshot.remainingSeconds },
+    serverNow: match.serverNow,
+  }))
 
   return (
     <div className={pageShellClass} dir="rtl">

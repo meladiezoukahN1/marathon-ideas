@@ -43,10 +43,45 @@ export function assertCanStartVoting(
   }
 }
 
-export function assertCanFinalizeResult(phase: ChallengePhase): void {
-  if (phase !== "VOTING") {
-    throw new WorkflowError("Can only finalize result from VOTING phase")
+export function assertCanFinalizeResult(
+  phase: ChallengePhase,
+  votingTimerStatus?: string,
+  votingEndsAt?: string | null,
+): void {
+  console.log("[FINALIZE_RESULT_GUARD_CHECK]", JSON.stringify({
+    phase,
+    votingTimerStatus: votingTimerStatus ?? null,
+    votingEndsAt: votingEndsAt ?? null,
+    now: new Date().toISOString(),
+  }))
+
+  // Allow idempotent re-reveal if already in RESULT
+  if (phase === "RESULT") {
+    console.log("[FINALIZE_RESULT_ALLOWED]", JSON.stringify({ phase, reason: "already in RESULT" }))
+    return
   }
+
+  // Must be in VOTING phase
+  if (phase !== "VOTING") {
+    console.log("[FINALIZE_RESULT_BLOCKED]", JSON.stringify({ phase, reason: "not VOTING" }))
+    throw new WorkflowError("Can only finalize result after voting ends")
+  }
+
+  // Allow if voting timer is explicitly finished or paused
+  if (votingTimerStatus === "FINISHED" || votingTimerStatus === "PAUSED") {
+    console.log("[FINALIZE_RESULT_ALLOWED]", JSON.stringify({ phase, votingTimerStatus, reason: "voting ended or paused" }))
+    return
+  }
+
+  // Allow if votingEndsAt has passed (natural expiry with 5s grace)
+  if (votingEndsAt && Date.now() >= new Date(votingEndsAt).getTime() - 5000) {
+    console.log("[FINALIZE_RESULT_ALLOWED]", JSON.stringify({ phase, votingEndsAt, reason: "voting naturally expired" }))
+    return
+  }
+
+  // Voting timer is still RUNNING or not started
+  console.log("[FINALIZE_RESULT_BLOCKED]", JSON.stringify({ phase, votingTimerStatus, reason: "voting still open or not started" }))
+  throw new WorkflowError("Can only finalize result after voting ends")
 }
 
 export function assertVotingIsClosed(votingEndsAt: string | null, votingTimerStatus?: string): void {

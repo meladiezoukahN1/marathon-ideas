@@ -28,6 +28,9 @@ export function PhaseControl({
   isLoading: boolean
 }) {
   const [countdown, setCountdown] = useState(0)
+  const resultCalculated = challenge.team1FinalScore != null || challenge.team2FinalScore != null
+  const isTie = challenge.isTie ?? (resultCalculated && !challenge.winnerId)
+  const canRevealResult = resultCalculated || Boolean(challenge.winnerId) || isTie
 
   const canAdvance = challenge.phase === "WAITING" || challenge.phase === "RESULT"
 
@@ -87,7 +90,7 @@ export function PhaseControl({
               {formatCountdown(countdown)}
             </p>
           </div>
-          {!challenge.winnerId ? (
+          {!canRevealResult ? (
             <button
               onClick={onCalculateResult}
               disabled={isLoading}
@@ -105,7 +108,7 @@ export function PhaseControl({
                 disabled={isLoading}
                 className="w-full px-3 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold disabled:opacity-50 hover:bg-purple-700 transition"
               >
-                عرض النتيجة على الشاشة
+                إظهار النتيجة
               </button>
             </div>
           )}
@@ -128,7 +131,7 @@ export function PhaseControl({
             disabled={isLoading}
             className="w-full px-3 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold disabled:opacity-50 hover:bg-purple-700 transition"
           >
-            عرض النتيجة على الشاشة
+            إظهار النتيجة
           </button>
         </div>
       )}

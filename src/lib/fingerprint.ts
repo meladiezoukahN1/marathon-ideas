@@ -3,7 +3,7 @@
 /**
  * Lightweight fingerprint — no external library.
  * Good enough for a live event: stops casual double-voting.
- * Real guarantee is the server-side Redis SET NX lock scoped to challengeId + votingSessionId.
+ * Real guarantee is the server-side MySQL unique constraint scoped to challengeId + votingSessionId.
  *
  * Anonymous voting limitation:
  * One vote per browser voterToken per challenge/session.

@@ -41,6 +41,7 @@ export default function VotePage() {
     if (json.data?.success || json.error === "ALREADY_VOTED") {
       markVotedLocally(challengeId, challenge?.votingSessionId); setVoted(true)
     } else {
+      console.log("Vote error:", json)
       setError("حدث خطأ، حاول مجدداً")
     }
     setSubmitting(false)

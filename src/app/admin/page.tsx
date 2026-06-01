@@ -11,7 +11,22 @@ import { VoteAuditViewer } from "@/components/admin/VoteAuditViewer"
 import { Badge } from "@/components/ui/Badge"
 import { CardSkeleton } from "@/components/ui/Skeleton"
 import { getChallengePhaseLabel } from "@/lib/labels"
+import { computePresentationSnapshot, deriveActivePresentationTeam } from "@/lib/timer-snapshot"
 import type { ChallengePublic } from "@/types/domain.types"
+
+function deriveResultUiState(challenge: Pick<ChallengePublic, "phase" | "winnerId" | "team1FinalScore" | "team2FinalScore" | "isTie" | "tieReason">) {
+  const resultCalculated = challenge.team1FinalScore != null || challenge.team2FinalScore != null
+  const isTie = challenge.isTie ?? (resultCalculated && !challenge.winnerId)
+  const canRevealResult = resultCalculated || Boolean(challenge.winnerId) || isTie
+
+  return {
+    resultCalculated,
+    isTie,
+    tieReason: challenge.tieReason ?? null,
+    canRevealResult,
+    phase: challenge.phase,
+  }
+}
 
 async function timerPost(matchId: string, slot: "TEAM1" | "TEAM2", action: string, payload?: object) {
   const path = action === "patch"
@@ -49,7 +64,7 @@ async function calculateResult(matchId: string) {
   const res = await fetch(`/api/admin/matches/${matchId}/result`, { method: "POST" })
   const json = await res.json()
   if (json.error) throw new Error(json.error)
-  return json
+  return json.data
 }
 
 async function getVoteCounts(matchId: string) {
@@ -177,25 +192,70 @@ export default function AdminDashboard() {
     if (!challenge) return
     setActing(true)
     try {
+      const beforeState = deriveResultUiState(challenge)
+      console.log("[RESULT_CALCULATE_UI_START]", JSON.stringify({
+        challengeId: challenge.id,
+        winnerId: challenge.winnerId,
+        isTie: beforeState.isTie,
+        tieReason: beforeState.tieReason,
+        resultCalculated: beforeState.resultCalculated,
+        canRevealResult: beforeState.canRevealResult,
+        phase: beforeState.phase,
+      }))
+
       const result = await calculateResult(challenge.id)
-      // Do NOT change phase here — calculation ≠ reveal
-      setChallenges(p => p.map(c => c.id === challenge.id ? {
-        ...c,
+      const updatedChallenge: ChallengePublic = {
+        ...challenge,
         winnerId: result.winnerId,
+        isTie: result.isTie,
+        tieReason: result.tieReason,
         team1FinalScore: result.team1FinalScore,
         team2FinalScore: result.team2FinalScore,
         team1PublicPct: result.team1PublicPct,
         team2PublicPct: result.team2PublicPct,
         team1JuryPct: result.team1JuryPct,
         team2JuryPct: result.team2JuryPct,
-      } : c))
-      toast.success("تم حساب النتيجة!")
+      }
+      const stateAfter = deriveResultUiState(updatedChallenge)
+
+      console.log("[RESULT_CALCULATE_UI_SUCCESS]", JSON.stringify({
+        challengeId: challenge.id,
+        winnerId: result.winnerId,
+        isTie: result.isTie,
+        tieReason: result.tieReason,
+        resultCalculated: stateAfter.resultCalculated,
+        canRevealResult: stateAfter.canRevealResult,
+        phase: stateAfter.phase,
+      }))
+
+      // Do NOT change phase here — calculation ≠ reveal
+      setChallenges(p => p.map(c => c.id === challenge.id ? updatedChallenge : c))
+
+      console.log("[RESULT_CALCULATE_UI_STATE_AFTER]", JSON.stringify({
+        challengeId: updatedChallenge.id,
+        winnerId: updatedChallenge.winnerId,
+        isTie: stateAfter.isTie,
+        tieReason: stateAfter.tieReason,
+        resultCalculated: stateAfter.resultCalculated,
+        canRevealResult: stateAfter.canRevealResult,
+        phase: stateAfter.phase,
+      }))
+
+      if (result.tieReason === "NO_VOTES") {
+        toast.success("لم يتم تسجيل أي تصويت، وتم اعتبار النتيجة تعادلاً.")
+      } else if (result.tieReason === "EQUAL_SCORE") {
+        toast.success("النتيجة متعادلة وتحتاج إلى كسر التعادل.")
+      } else if (result.isTie) {
+        toast.success("تم حساب النتيجة — تعادل!")
+      } else {
+        toast.success("تم حساب النتيجة!")
+      }
     } catch (e) {
-      // Silently ignore auto-calculation errors (e.g. voting still open)
       if (e instanceof Error && e.message === "VOTING_STILL_OPEN") return
       toast.error(e instanceof Error ? e.message : "فشل حساب النتيجة")
+    } finally {
+      setActing(false)
     }
-    setActing(false)
   }, [challenge])
 
   async function revealResult(matchId: string) {
@@ -207,7 +267,7 @@ export default function AdminDashboard() {
 
   const handleReveal = useCallback(async () => {
     if (!challenge) return
-    if (!challenge.winnerId) {
+    if (challenge.team1FinalScore == null) {
       toast.error("يجب حساب النتيجة أولاً")
       return
     }
@@ -278,32 +338,44 @@ export default function AdminDashboard() {
     setActing(false)
   }, [challenge])
 
-  // Live timer calculation (same logic as useLiveTimer hook)
-  function getLiveTimerState(timer: ChallengePublic["team1Timer"]) {
-    if (!timer) return { remainingSeconds: 0, status: "READY" as const, isFinished: true }
-    if (timer.status !== "RUNNING" || !timer.startedAt) {
-      return {
-        remainingSeconds: Math.max(0, timer.remainingSeconds),
-        status: timer.status,
-        isFinished: timer.status === "FINISHED" || timer.remainingSeconds <= 0,
-      }
-    }
-    const elapsed = Math.floor((Date.now() - new Date(timer.startedAt).getTime()) / 1000)
-    const remaining = Math.max(0, timer.remainingSeconds - elapsed)
-    const isFinished = remaining <= 0
-    return {
-      remainingSeconds: remaining,
-      status: isFinished ? "FINISHED" : timer.status,
-      isFinished,
-    }
+  function makeSnapshot(timer: ChallengePublic["team1Timer"]) {
+    if (!timer) return null
+    const serverNow = Date.now()
+    return computePresentationSnapshot({
+      status: timer.status,
+      remainingSeconds: timer.remainingSeconds,
+      startedAt: timer.startedAt,
+      pausedAt: timer.pausedAt,
+      durationSeconds: timer.durationSeconds,
+    }, serverNow)
   }
 
-  const t1Live = getLiveTimerState(challenge?.team1Timer)
-  const t2Live = getLiveTimerState(challenge?.team2Timer)
+  const t1Snapshot = makeSnapshot(challenge?.team1Timer)
+  const t2Snapshot = makeSnapshot(challenge?.team2Timer)
 
-  const team1Finished = t1Live.isFinished
-  const team2Finished = t2Live.isFinished
+  const t1Ended = t1Snapshot?.status === "ENDED"
+  const t2Ended = t2Snapshot?.status === "ENDED"
+  const team1Finished = t1Ended || t1Snapshot?.remainingSeconds === 0
+  const team2Finished = t2Ended || t2Snapshot?.remainingSeconds === 0
   const bothTeamsFinished = team1Finished && team2Finished
+
+  const adminActiveTeam = challenge
+    ? deriveActivePresentationTeam(
+        t1Snapshot ?? { status: "IDLE", durationSeconds: 0, remainingSeconds: 0, startsAt: null, startedAt: null, pausedAt: null, serverNow: new Date().toISOString() },
+        t2Snapshot ?? { status: "IDLE", durationSeconds: 0, remainingSeconds: 0, startsAt: null, startedAt: null, pausedAt: null, serverNow: new Date().toISOString() },
+        { status: "IDLE", durationSeconds: challenge.votingDurationSeconds, remainingSeconds: challenge.votingDurationSeconds, startsAt: null, startedAt: null, pausedAt: null, serverNow: new Date().toISOString() },
+        challenge.phase,
+      )
+    : "WAITING"
+
+  console.log("[ADMIN_TIMER_STATE]", JSON.stringify({
+    challengeId: challenge?.id,
+    phase: challenge?.phase,
+    activePresentationTeam: adminActiveTeam,
+    team1: { status: t1Snapshot?.status, remainingSeconds: t1Snapshot?.remainingSeconds },
+    team2: { status: t2Snapshot?.status, remainingSeconds: t2Snapshot?.remainingSeconds },
+    serverNow: new Date().toISOString(),
+  }))
 
   const canStartVoting =
     bothTeamsFinished &&

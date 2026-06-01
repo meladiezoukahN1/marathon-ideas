@@ -50,6 +50,14 @@ export interface PublicActiveMatch {
   order: number
   phase: string
   winnerId: string | null
+  team1FinalScore: number | null
+  team2FinalScore: number | null
+  team1PublicPct: number | null
+  team2PublicPct: number | null
+  team1JuryPct: number | null
+  team2JuryPct: number | null
+  isTie: boolean
+  tieReason: string | null
   votingEndsAt: string | null
   votingSessionId: string | null
   votingTimerStatus: string
@@ -59,6 +67,10 @@ export interface PublicActiveMatch {
   team2: { id: string; name: string; imageUrl: string | null } | null
   team1Timer: TimerState
   team2Timer: TimerState
+  team1TimerSnapshot: import("@/lib/timer-snapshot").TimerSnapshot
+  team2TimerSnapshot: import("@/lib/timer-snapshot").TimerSnapshot
+  votingTimerSnapshot: import("@/lib/timer-snapshot").TimerSnapshot
+  activePresentationTeam: import("@/lib/timer-snapshot").ActivePresentationTeam
   serverNow: string
 }
 

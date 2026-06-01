@@ -18,9 +18,10 @@ import {
   assertNoOtherActiveChallenge,
   assertChallengeCanBeActivated,
 } from "./workflow"
-import { getRedisVoteCounts } from "@/server/modules/voting/service"
+import { getVoteCounts } from "@/server/modules/voting/service"
 import crypto from "crypto"
 import type { TimerStatus, TeamSlot, TimerPayload } from "./types"
+import { computeEffectiveElapsed } from "@/lib/timer-snapshot"
 
 const EVENT_ID = process.env.NEXT_PUBLIC_EVENT_ID ?? "event-001"
 
@@ -84,10 +85,14 @@ export async function pauseTimer(matchId: string, slot: TeamSlot) {
     timer.remainingSeconds,
     timer.startedAt,
   )
+  const effectiveElapsed = computeEffectiveElapsed(timer.startedAt)
+  const adjusted = timer.remainingSeconds - effectiveElapsed
+
+  const remainingToStore = Math.max(0, Math.min(actualRemaining, adjusted))
 
   await updateTimerState(matchId, slot, {
-    remainingSeconds: actualRemaining,
-    status: actualRemaining <= 0 ? "FINISHED" : "PAUSED",
+    remainingSeconds: remainingToStore,
+    status: remainingToStore <= 0 ? "FINISHED" : "PAUSED",
     startedAt: null,
     pausedAt: new Date(),
   })
@@ -194,7 +199,7 @@ export async function changePhase(matchId: string, nextPhase: string, votingDura
     extra.status = "ACTIVE"
   }
   if (nextPhase === "RESULT") {
-    assertCanFinalizeResult(currentPhase)
+    assertCanFinalizeResult(currentPhase, match.votingTimerStatus, match.votingEndsAt)
     extra.voteCloseAt = new Date()
     // Keep status ACTIVE — RESULT still blocks other challenges
   }
@@ -220,8 +225,31 @@ export async function calculateAndStoreResult(matchId: string) {
     throw new Error("RESULT_NOT_READY")
   }
 
+  console.log("[RESULT_CALCULATION_INPUT]", JSON.stringify({
+    matchId,
+    phase: match.phase,
+    votingStartedAt: match.votingStartedAt,
+    votingSessionId: match.votingSessionId,
+    votingTimerStatus: match.votingTimerStatus,
+    votingEndsAt: match.votingEndsAt,
+    hasTeam1: !!match.team1,
+    hasTeam2: !!match.team2,
+  }))
+
   // Idempotent: if already calculated, return existing result
   if (match.phase === "RESULT" && match.winnerId !== undefined) {
+    const resultCalculated = match.team1FinalScore !== null || match.team2FinalScore !== null
+    const isTie = resultCalculated && match.winnerId === null
+    const allPctZero =
+      (match.team1PublicPct ?? 0) === 0 &&
+      (match.team2PublicPct ?? 0) === 0 &&
+      (match.team1JuryPct ?? 0) === 0 &&
+      (match.team2JuryPct ?? 0) === 0
+    const tieReason = isTie ? (allPctZero ? "NO_VOTES" : "EQUAL_SCORE") : null
+
+    console.log("[RESULT_CALCULATION_OUTPUT] idempotent return", JSON.stringify({
+      matchId, winnerId: match.winnerId,
+    }))
     return {
       winnerId: match.winnerId,
       team1FinalScore: match.team1FinalScore ?? 0,
@@ -230,6 +258,8 @@ export async function calculateAndStoreResult(matchId: string) {
       team2PublicPct: match.team2PublicPct ?? 0,
       team1JuryPct: match.team1JuryPct ?? 0,
       team2JuryPct: match.team2JuryPct ?? 0,
+      isTie,
+      tieReason,
     }
   }
 
@@ -245,8 +275,9 @@ export async function calculateAndStoreResult(matchId: string) {
   }
   assertVotingIsClosed(match.votingEndsAt, match.votingTimerStatus)
 
-  if (!match.votingStartedAt) throw new Error("MATCH_NOT_READY")
-  const counts = await getRedisVoteCounts(matchId, new Date(match.votingStartedAt))
+  if (!match.votingSessionId && !match.votingStartedAt) throw new Error("MATCH_NOT_READY")
+  const sessionId = match.votingSessionId ?? match.votingStartedAt!
+  const counts = await getVoteCounts(matchId, sessionId)
   const t1 = match.team1
   const t2 = match.team2
   if (!t1 || !t2) throw new Error("MATCH_NEEDS_TWO_TEAMS")
@@ -254,44 +285,62 @@ export async function calculateAndStoreResult(matchId: string) {
   const totalPublic = counts.totalPublic
   const totalJury = counts.totalJury
 
+  console.log("[RESULT_CALCULATION_COUNTS]", JSON.stringify({
+    matchId,
+    totalPublic,
+    totalJury,
+    team1Public: counts.team1Public,
+    team2Public: counts.team2Public,
+    team1Jury: counts.team1Jury,
+    team2Jury: counts.team2Jury,
+  }))
+
   let team1PublicPct = 0
   let team2PublicPct = 0
   let team1JuryPct = 0
   let team2JuryPct = 0
   let team1FinalScore = 0
   let team2FinalScore = 0
+  let tieReason: string | null = null
 
-  if (totalPublic > 0) {
-    team1PublicPct = (counts.team1Public / totalPublic) * 100
-    team2PublicPct = (counts.team2Public / totalPublic) * 100
-  }
-
-  if (totalJury > 0) {
-    team1JuryPct = (counts.team1Jury / totalJury) * 100
-    team2JuryPct = (counts.team2Jury / totalJury) * 100
-  }
-
-  // Weighted: public 40%, jury 60%
-  if (totalPublic > 0 && totalJury > 0) {
-    team1FinalScore = team1PublicPct * 0.4 + team1JuryPct * 0.6
-    team2FinalScore = team2PublicPct * 0.4 + team2JuryPct * 0.6
-  } else if (totalPublic > 0) {
-    team1FinalScore = team1PublicPct
-    team2FinalScore = team2PublicPct
-  } else if (totalJury > 0) {
-    team1FinalScore = team1JuryPct
-    team2FinalScore = team2JuryPct
-  } else {
-    // No votes at all — equal
+  if (totalPublic === 0 && totalJury === 0) {
+    tieReason = "NO_VOTES"
     team1FinalScore = 50
     team2FinalScore = 50
+  } else {
+    if (totalPublic > 0) {
+      team1PublicPct = (counts.team1Public / totalPublic) * 100
+      team2PublicPct = (counts.team2Public / totalPublic) * 100
+    }
+
+    if (totalJury > 0) {
+      team1JuryPct = (counts.team1Jury / totalJury) * 100
+      team2JuryPct = (counts.team2Jury / totalJury) * 100
+    }
+
+    // Weighted: public 40%, jury 60%
+    if (totalPublic > 0 && totalJury > 0) {
+      team1FinalScore = team1PublicPct * 0.4 + team1JuryPct * 0.6
+      team2FinalScore = team2PublicPct * 0.4 + team2JuryPct * 0.6
+    } else if (totalPublic > 0) {
+      team1FinalScore = team1PublicPct
+      team2FinalScore = team2PublicPct
+    } else if (totalJury > 0) {
+      team1FinalScore = team1JuryPct
+      team2FinalScore = team2JuryPct
+    }
+
+    // Round to 1 decimal
+    team1FinalScore = Math.round(team1FinalScore * 10) / 10
+    team2FinalScore = Math.round(team2FinalScore * 10) / 10
+
+    if (team1FinalScore === team2FinalScore) {
+      tieReason = "EQUAL_SCORE"
+    }
   }
 
-  // Round to 1 decimal
-  team1FinalScore = Math.round(team1FinalScore * 10) / 10
-  team2FinalScore = Math.round(team2FinalScore * 10) / 10
-
   const winnerId = team1FinalScore > team2FinalScore ? t1.id : team2FinalScore > team1FinalScore ? t2.id : null
+  const isTie = winnerId === null
 
   await storeResult(matchId, {
     winnerId,
@@ -303,6 +352,21 @@ export async function calculateAndStoreResult(matchId: string) {
     team2JuryPct: Math.round(team2JuryPct * 10) / 10,
   })
 
+  console.log("[RESULT_CALCULATION_OUTPUT]", JSON.stringify({
+    matchId,
+    publicVoteCount: totalPublic,
+    juryScoreCount: totalJury,
+    team1PublicPct,
+    team2PublicPct,
+    team1JuryPct,
+    team2JuryPct,
+    team1FinalScore,
+    team2FinalScore,
+    winnerId,
+    isTie,
+    tieReason,
+  }))
+
   return {
     winnerId,
     team1FinalScore,
@@ -311,16 +375,17 @@ export async function calculateAndStoreResult(matchId: string) {
     team2PublicPct,
     team1JuryPct,
     team2JuryPct,
+    isTie,
+    tieReason,
   }
 }
 
 export async function getMatchVoteCounts(matchId: string) {
   const match = await getMatchById(matchId)
-  if (!match || !match.votingStartedAt) {
+  if (!match || !match.votingSessionId || !match.votingStartedAt) {
     return { team1Public: 0, team2Public: 0, totalPublic: 0, team1Jury: 0, team2Jury: 0, totalJury: 0 }
   }
-  const counts = await getRedisVoteCounts(matchId, new Date(match.votingStartedAt))
-  return counts
+  return getVoteCounts(matchId, match.votingSessionId)
 }
 
 export async function finalizeExpiredVotingIfNeeded(matchId: string) {
