@@ -5,9 +5,7 @@ import { Providers } from "@/components/shared/Providers"
 import "./globals.css"
 
 const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://marathon-ideas.vercel.app"
-
-const ogImageUrl = `${siteUrl}/og-marathon-v2.jpg`
+  process.env.NEXTAUTH_URL || "https://marathon-ideas.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -18,7 +16,7 @@ export const metadata: Metadata = {
   },
 
   description:
-    "تابع التحديات، صوّت للفريق الأفضل، وشاهد النتائج مباشرة في ماراثون الأفكار.",
+    "منصة تفاعلية لعرض التحديات، التصويت المباشر، ومتابعة نتائج الفرق المشاركة في ماراثون الأفكار.",
 
   applicationName: "ماراثون الأفكار",
 
@@ -47,10 +45,6 @@ export const metadata: Metadata = {
     apple: "/SVG/gradient_color_logo-black_bg.svg",
   },
 
-  alternates: {
-    canonical: siteUrl,
-  },
-
   openGraph: {
     type: "website",
     locale: "ar_LY",
@@ -61,11 +55,10 @@ export const metadata: Metadata = {
       "تابع التحديات، صوّت للفريق الأفضل، وشاهد النتائج مباشرة في ماراثون الأفكار.",
     images: [
       {
-        url: ogImageUrl,
+        url: "/og-marathon-v2.jpg",
         width: 1200,
         height: 630,
         alt: "ماراثون الأفكار - منصة التصويت والتحديات",
-        type: "image/jpeg",
       },
     ],
   },
@@ -75,7 +68,7 @@ export const metadata: Metadata = {
     title: "ماراثون الأفكار",
     description:
       "تابع التحديات، صوّت للفريق الأفضل، وشاهد النتائج مباشرة في ماراثون الأفكار.",
-    images: [ogImageUrl, "/og-marathon-v2.jpg"],
+    images: ["/og-marathon-v2.jpg"],
   },
 
   robots: {
