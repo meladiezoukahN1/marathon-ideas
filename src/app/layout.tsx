@@ -5,10 +5,16 @@ import { Providers } from "@/components/shared/Providers"
 import "./globals.css"
 
 const siteUrl =
-  process.env.NEXTAUTH_URL || "https://marathon-ideas.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL || "https://marathon-ideas.vercel.app"
+
+const ogImageUrl = `${siteUrl}/og-marathon-v2.jpg`
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
+
+  alternates: {
+    canonical: siteUrl,
+  },
 
   title: {
     default: "ماراثون الأفكار",
@@ -55,9 +61,10 @@ export const metadata: Metadata = {
       "تابع التحديات، صوّت للفريق الأفضل، وشاهد النتائج مباشرة في ماراثون الأفكار.",
     images: [
       {
-        url: "/og-marathon-v2.jpg",
+        url: ogImageUrl,
         width: 1200,
         height: 630,
+        type: "image/jpeg",
         alt: "ماراثون الأفكار - منصة التصويت والتحديات",
       },
     ],
@@ -68,7 +75,7 @@ export const metadata: Metadata = {
     title: "ماراثون الأفكار",
     description:
       "تابع التحديات، صوّت للفريق الأفضل، وشاهد النتائج مباشرة في ماراثون الأفكار.",
-    images: ["/og-marathon-v2.jpg"],
+    images: [ogImageUrl],
   },
 
   robots: {

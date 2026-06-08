@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic"
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL || "https://marathon-ideas.vercel.app"
 
-const ogImageUrl = `${siteUrl}/og-marathon.png`
+const ogImageUrl = `${siteUrl}/og-marathon-v2.jpg`
 
 export const metadata: Metadata = {
   title: "التصويت",
@@ -19,12 +19,13 @@ export const metadata: Metadata = {
     url: `${siteUrl}/vote`,
     siteName: "ماراثون الأفكار",
     title: "التصويت | ماراثون الأفكار",
-    description: "شارك في التصويت واختر الفريق الأفضل في التحدي الحالي.",
+    description: "شارك في التصويت واختر الفريق الأفضل في ماراثون الأفكار.",
     images: [
       {
         url: ogImageUrl,
         width: 1200,
         height: 630,
+        type: "image/jpeg",
         alt: "التصويت في ماراثون الأفكار",
       },
     ],
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "التصويت | ماراثون الأفكار",
-    description: "شارك في التصويت واختر الفريق الأفضل في التحدي الحالي.",
+    description: "شارك في التصويت واختر الفريق الأفضل في ماراثون الأفكار.",
     images: [ogImageUrl],
   },
 }
