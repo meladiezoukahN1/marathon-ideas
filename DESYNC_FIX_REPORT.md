@@ -21,14 +21,17 @@ All fixes maintain backward compatibility. No schema changes. No WebSocket/Socke
 ```typescript
 // BEFORE: Hardcoded Date.now()
 function computeElapsedSeconds(startedAt: string | null): number {
-  if (!startedAt) return 0
-  return Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000)
+  if (!startedAt) return 0;
+  return Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
 }
 
 // AFTER: Respects now parameter
-function computeElapsedSeconds(startedAt: string | null, now: number = Date.now()): number {
-  if (!startedAt) return 0
-  return Math.floor((now - new Date(startedAt).getTime()) / 1000)
+function computeElapsedSeconds(
+  startedAt: string | null,
+  now: number = Date.now(),
+): number {
+  if (!startedAt) return 0;
+  return Math.floor((now - new Date(startedAt).getTime()) / 1000);
 }
 ```
 
@@ -41,17 +44,21 @@ function computeElapsedSeconds(startedAt: string | null, now: number = Date.now(
 ### 2. Added Cache Control Headers
 
 **Files**:
+
 - [src/app/api/public/active-match/route.ts](src/app/api/public/active-match/route.ts)
 - [src/app/api/admin/matches/route.ts](src/app/api/admin/matches/route.ts)
 
 ```typescript
-export const dynamic = "force-dynamic"
-export const revalidate = 0
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 // Response headers added:
-responseWithHeaders.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
-responseWithHeaders.headers.set("Pragma", "no-cache")
-responseWithHeaders.headers.set("Expires", "0")
+responseWithHeaders.headers.set(
+  "Cache-Control",
+  "no-store, no-cache, must-revalidate, proxy-revalidate",
+);
+responseWithHeaders.headers.set("Pragma", "no-cache");
+responseWithHeaders.headers.set("Expires", "0");
 ```
 
 **Impact**: Ensures CDN and browser never cache live-state responses. Every fetch gets fresh server data.
@@ -86,6 +93,7 @@ function makeSnapshot(timer) {
 Log name: `[DISPLAY_LIVE_STATE_FETCHED]`
 
 Includes:
+
 - `eventId`, `matchId`, `phase`
 - Raw DB timer fields: `status`, `startedAt`, `remainingSeconds`, `durationSeconds`
 - Computed snapshots: `status`, `remainingSeconds`
@@ -102,12 +110,14 @@ Includes same fields for all matches
 Log name: `[PUBLIC_DISPLAY_POLL_TICK]`
 
 Logs every 1000ms with:
+
 - `receivedChallengeId`
 - `activePresentationTeam`
 - `team1Remaining`, `team2Remaining`
 - `serverNow`
 
 **Debug Usage**:
+
 ```bash
 # Monitor logs
 npm run dev 2>&1 | grep "DISPLAY_LIVE_STATE_FETCHED\|PUBLIC_DISPLAY_POLL_TICK\|ADMIN_LIVE_STATE_RENDERED_REQUEST"
@@ -118,6 +128,7 @@ npm run dev 2>&1 | grep "DISPLAY_LIVE_STATE_FETCHED\|PUBLIC_DISPLAY_POLL_TICK\|A
 ## Test Coverage
 
 ### Existing Tests (All Passing)
+
 - **timer-snapshot.test.ts**: 20 tests ✅
 - **timer.test.ts**: 8 tests ✅
 - **result.test.ts**: 12 tests ✅
@@ -126,25 +137,31 @@ npm run dev 2>&1 | grep "DISPLAY_LIVE_STATE_FETCHED\|PUBLIC_DISPLAY_POLL_TICK\|A
 - **Total**: 53/53 tests passing ✅
 
 ### New Tests (All Passing)
+
 **File**: [tests/desync-fix.test.ts](tests/desync-fix.test.ts)
 
 #### Phase 4: Expired Timer Finalization Order
+
 - ✅ Expired RUNNING timer with remainingSeconds ≤ 0 becomes ENDED
 - ✅ team1 ENDED + team2 READY → activeTeam = WAITING (not TEAM1)
 - ✅ team1 ENDED + team2 RUNNING → activeTeam = TEAM2
 - ✅ team1 ENDED + team2 PAUSED → activeTeam = TEAM2
 
 #### Phase 3: Same Endpoint Verification
+
 - ✅ computePresentationSnapshot consistent across multiple calls
 
 #### Stale State Prevention
+
 - ✅ Expired team1 shows WAITING, not lingering TEAM1
 - ✅ Admin reset immediately reflects in next display poll
 
 #### Polling Consistency
+
 - ✅ Multiple rapid polls return same active team for same server state
 
 **Run tests**:
+
 ```bash
 npm test -- desync-fix.test.ts --no-coverage
 ```
@@ -154,16 +171,19 @@ npm test -- desync-fix.test.ts --no-coverage
 ## Technical Verification
 
 ### Compilation
+
 ```bash
 npx tsc --noEmit  # ✅ PASS - No TypeScript errors
 ```
 
 ### All Tests
+
 ```bash
 npm test -- --no-coverage  # ✅ PASS - 53/53 tests passing
 ```
 
 ### Build Status
+
 ```bash
 npm run build  # Pre-existing unrelated error in Next.js page collection
 ```
@@ -173,6 +193,7 @@ npm run build  # Pre-existing unrelated error in Next.js page collection
 ## Data Flow After Fix
 
 ### Display Screen Polling (Every 1000ms)
+
 1. **Request**: `GET /api/public/active-match`
 2. **Server**:
    - Loads match from DB
@@ -184,6 +205,7 @@ npm run build  # Pre-existing unrelated error in Next.js page collection
 4. **Display**: Renders based on snap.status
 
 ### Admin Screen
+
 1. **Initial load**: `GET /api/admin/matches`
 2. **Component rendering**:
    - Calls `makeSnapshot(timer)` with **Date.now()** ✅
@@ -197,12 +219,14 @@ npm run build  # Pre-existing unrelated error in Next.js page collection
 ## Scenario Verification
 
 ### Before Fix
+
 - Team1 timer ends at Time T
 - Server: snap.status = ENDED ✓
 - Admin: Shows ENDED ✓
 - Display: Still shows 09:48 (cached, stale elapsed calculation) ✗
 
 ### After Fix
+
 - Team1 timer ends at Time T
 - Server: `computeElapsedSeconds(startedAt, serverNow)` correctly calculates expired ✓
 - Server: snap.remainingSeconds = 0, status = ENDED ✓
@@ -239,6 +263,7 @@ npm run build
 ## Backward Compatibility
 
 ✅ **All changes backward compatible**:
+
 - API responses unchanged (only added internal logs)
 - Component props unchanged
 - Timer behavior unchanged
@@ -263,6 +288,7 @@ npm run build
 ## Next Steps
 
 ### Manual Testing Recommended
+
 1. Open admin and display screens side-by-side
 2. Start team1 timer for 10 minutes
 3. Verify display shows team1 counting down
@@ -271,7 +297,9 @@ npm run build
 6. Don't see stale 09:48 for team1 ✓
 
 ### Monitoring
+
 Monitor these console logs during testing:
+
 ```
 [DISPLAY_LIVE_STATE_FETCHED] - What display receives from server
 [ADMIN_LIVE_STATE_RENDERED_REQUEST] - What admin loads
@@ -282,14 +310,13 @@ Monitor these console logs during testing:
 
 ## Summary of Fixes
 
-| Phase | Issue | Fix | Status |
-|-------|-------|-----|---------|
-| 1 | No logs | Added endpoint logs | ✅ |
-| 2 | No polling logs | Added display poll logs | ✅ |
-| 3 | Duplicate computation | Both use same function | ✅ |
-| 4 | Stale timers not ended | Fixed time calculation | ✅ |
-| 5 | Cache issues | Added cache headers | ✅ |
-| 6 | Manual test | Ready to execute | ⏳ |
-| 7 | No tests | Added 8 tests | ✅ |
-| 8 | No verification | All 53 tests pass | ✅ |
-
+| Phase | Issue                  | Fix                     | Status |
+| ----- | ---------------------- | ----------------------- | ------ |
+| 1     | No logs                | Added endpoint logs     | ✅     |
+| 2     | No polling logs        | Added display poll logs | ✅     |
+| 3     | Duplicate computation  | Both use same function  | ✅     |
+| 4     | Stale timers not ended | Fixed time calculation  | ✅     |
+| 5     | Cache issues           | Added cache headers     | ✅     |
+| 6     | Manual test            | Ready to execute        | ⏳     |
+| 7     | No tests               | Added 8 tests           | ✅     |
+| 8     | No verification        | All 53 tests pass       | ✅     |

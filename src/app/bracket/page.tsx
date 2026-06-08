@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { TeamAvatar } from "@/components/common/team-avatar"
 import { getChallengePhaseLabel } from "@/lib/labels"
 
 interface BracketMatch {
@@ -13,8 +12,8 @@ interface BracketMatch {
   winnerId: string | null
   team1FinalScore: number | null
   team2FinalScore: number | null
-  team1: { id: string; name: string; imageUrl: string | null } | null
-  team2: { id: string; name: string; imageUrl: string | null } | null
+  team1: { id: string; name: string } | null
+  team2: { id: string; name: string } | null
 }
 
 type MatchVisualState = "active" | "finished" | "waiting"
@@ -42,26 +41,32 @@ function getMatchStatusLabel(match: BracketMatch): string {
 function PageBackground() {
   return (
     <>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(245,158,11,0.18),transparent_28%),radial-gradient(circle_at_86%_18%,rgba(14,165,233,0.2),transparent_30%),radial-gradient(circle_at_50%_100%,rgba(16,185,129,0.13),transparent_36%),linear-gradient(135deg,#fffdf7_0%,#eef8ff_48%,#f8fafc_100%)]" />
-      <div className="absolute inset-0 bg-white/35" />
-      <div className="absolute right-[-90px] top-20 h-56 w-56 rounded-full bg-amber-300/20 blur-3xl sm:h-72 sm:w-72" />
-      <div className="absolute left-[-90px] bottom-10 h-56 w-56 rounded-full bg-sky-300/20 blur-3xl sm:h-72 sm:w-72" />
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('/BACKGROUND-01.png')",
+        }}
+      />
+      <div className="absolute inset-0 bg-slate-950/70" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.12),transparent_28%),radial-gradient(circle_at_85%_15%,rgba(14,165,233,0.10),transparent_30%),radial-gradient(circle_at_50%_95%,rgba(16,185,129,0.08),transparent_34%)]" />
     </>
   )
 }
 
 function LoadingState() {
   return (
-    <div className="relative min-h-screen overflow-hidden text-slate-900" dir="rtl">
+    <div className="relative min-h-screen overflow-hidden text-white" dir="rtl">
       <PageBackground />
 
       <main className="relative z-10 flex min-h-screen items-center justify-center px-4">
-        <div className="w-full max-w-xl rounded-[2rem] border border-white/85 bg-white/88 px-6 py-8 text-center shadow-xl shadow-sky-100/80 backdrop-blur-xl sm:px-10 sm:py-10">
-          <div className="mx-auto mb-5 h-12 w-12 rounded-full border-4 border-sky-200 border-t-sky-600" />
-          <h1 className="text-2xl font-black text-sky-950 sm:text-3xl">
+        <div className="w-full max-w-xl rounded-[2rem] border border-white/15 bg-slate-950/55 px-6 py-8 text-center shadow-xl shadow-black/30 backdrop-blur-xl sm:px-10 sm:py-10">
+          <div className="mx-auto mb-5 h-12 w-12 rounded-full border-4 border-white/20 border-t-amber-400" />
+
+          <h1 className="text-2xl font-black text-white sm:text-3xl">
             جاري تحميل شجرة المنافسة...
           </h1>
-          <p className="mt-3 text-sm font-semibold text-slate-500 sm:text-base">
+
+          <p className="mt-3 text-sm font-semibold text-slate-300 sm:text-base">
             يتم تجهيز بيانات التحديات والفرق
           </p>
         </div>
@@ -72,20 +77,16 @@ function LoadingState() {
 
 function EmptyState() {
   return (
-    <div className="relative min-h-screen overflow-hidden text-slate-900" dir="rtl">
+    <div className="relative min-h-screen overflow-hidden text-white" dir="rtl">
       <PageBackground />
 
       <main className="relative z-10 flex min-h-screen items-center justify-center px-4">
-        <div className="w-full max-w-xl rounded-[2rem] border border-white/85 bg-white/88 px-6 py-8 text-center shadow-xl shadow-sky-100/80 backdrop-blur-xl sm:px-10 sm:py-10">
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-amber-100 text-3xl shadow-lg shadow-amber-100 sm:h-20 sm:w-20 sm:text-4xl">
-            🏆
-          </div>
-
-          <h1 className="text-2xl font-black text-sky-950 sm:text-3xl">
+        <div className="w-full max-w-xl rounded-[2rem] border border-white/15 bg-slate-950/55 px-6 py-8 text-center shadow-xl shadow-black/30 backdrop-blur-xl sm:px-10 sm:py-10">
+          <h1 className="text-2xl font-black text-white sm:text-3xl">
             لا توجد تحديات حالياً
           </h1>
 
-          <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-500 sm:text-base">
+          <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-300 sm:text-base">
             لم يتم إنشاء أي تحديات بعد. ستظهر شجرة المنافسة هنا عند توفر البيانات.
           </p>
         </div>
@@ -99,10 +100,10 @@ function MatchBadge({ match }: { match: BracketMatch }) {
 
   const className =
     state === "active"
-      ? "border-amber-300 bg-amber-400 text-slate-950 shadow-amber-100"
+      ? "border-amber-400/50 bg-amber-400/20 text-amber-200 shadow-amber-950/30"
       : state === "finished"
-        ? "border-emerald-300 bg-emerald-500 text-white shadow-emerald-100"
-        : "border-sky-200 bg-sky-50 text-sky-800 shadow-sky-100"
+        ? "border-emerald-400/50 bg-emerald-400/20 text-emerald-200 shadow-emerald-950/30"
+        : "border-white/15 bg-white/10 text-slate-300 shadow-black/20"
 
   return (
     <span
@@ -118,8 +119,8 @@ function VSBadge({ active }: { active: boolean }) {
     <div
       className={`z-10 mx-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-full border text-xl font-black shadow-xl backdrop-blur-xl sm:h-16 sm:w-16 sm:text-2xl md:h-20 md:w-20 md:text-3xl ${
         active
-          ? "border-amber-300 bg-amber-400 text-slate-950 shadow-amber-100"
-          : "border-white/90 bg-white/90 text-sky-800 shadow-sky-100"
+          ? "border-amber-400/60 bg-amber-400/20 text-amber-200 shadow-amber-950/30"
+          : "border-white/15 bg-white/10 text-slate-300 shadow-black/20"
       }`}
     >
       VS
@@ -142,34 +143,30 @@ function TeamCard({
 }) {
   const teamName = team?.name ?? "بانتظار الفريق"
 
-  const scoreClass = tone === "sky" ? "text-sky-700" : "text-emerald-700"
+  const scoreClass = tone === "sky" ? "text-sky-200" : "text-emerald-200"
 
   return (
     <div
       className={`min-w-0 rounded-[1.6rem] border p-4 text-center shadow-lg backdrop-blur-xl transition duration-300 sm:p-5 ${
         isWinner
-          ? "border-amber-300 bg-amber-50/95 shadow-amber-100 ring-2 ring-amber-200"
-          : "border-white/85 bg-white/88 shadow-sky-100/70"
+          ? "border-amber-400/60 bg-amber-400/20 shadow-amber-950/30 ring-2 ring-amber-300/30"
+          : "border-white/15 bg-white/10 shadow-black/25"
       }`}
     >
-      <div className="mx-auto w-fit rounded-2xl bg-white p-2 shadow-md ring-4 ring-sky-50">
-        <TeamAvatar name={teamName} imageUrl={team?.imageUrl} size="md" />
-      </div>
-
-      <h3 className="mt-3 line-clamp-2 min-h-[2.7rem] text-base font-black leading-tight text-slate-900 sm:text-lg md:text-xl">
+      <h3 className="line-clamp-2 min-h-[2.7rem] text-base font-black leading-tight text-white sm:text-lg md:text-xl">
         {teamName}
       </h3>
 
       {isFinished && score != null && (
         <div
-          className={`mx-auto mt-3 w-fit rounded-2xl bg-white px-4 py-2 text-2xl font-black leading-none shadow-md sm:text-3xl ${scoreClass}`}
+          className={`mx-auto mt-4 w-fit rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-2 text-2xl font-black leading-none shadow-md shadow-black/25 sm:text-3xl ${scoreClass}`}
         >
           {score}%
         </div>
       )}
 
       {isWinner && (
-        <div className="mx-auto mt-3 w-fit rounded-full bg-amber-400 px-4 py-1.5 text-xs font-black text-slate-950 shadow-md shadow-amber-100 sm:text-sm">
+        <div className="mx-auto mt-4 w-fit rounded-full border border-amber-300/40 bg-amber-400/25 px-4 py-1.5 text-xs font-black text-amber-100 shadow-md shadow-black/25 sm:text-sm">
           الفائز
         </div>
       )}
@@ -187,10 +184,10 @@ function BracketMatchCard({ match }: { match: BracketMatch }) {
 
   const wrapperClass =
     state === "active"
-      ? "border-amber-300 bg-white/92 shadow-amber-100 ring-2 ring-amber-200"
+      ? "border-amber-400/50 bg-slate-950/55 shadow-amber-950/30 ring-2 ring-amber-300/25"
       : state === "finished"
-        ? "border-emerald-200 bg-white/90 shadow-emerald-100"
-        : "border-white/85 bg-white/82 shadow-sky-100/70"
+        ? "border-emerald-400/40 bg-slate-950/50 shadow-emerald-950/25"
+        : "border-white/15 bg-slate-950/45 shadow-black/30"
 
   return (
     <article
@@ -205,7 +202,8 @@ function BracketMatchCard({ match }: { match: BracketMatch }) {
           <p className="text-xs font-black text-slate-400 sm:text-sm">
             التحدي رقم {match.order}
           </p>
-          <h2 className="mt-1 truncate text-lg font-black text-sky-950 sm:text-xl md:text-2xl">
+
+          <h2 className="mt-1 truncate text-lg font-black text-white sm:text-xl md:text-2xl">
             {match.name}
           </h2>
         </div>
@@ -260,38 +258,38 @@ function BracketSummary({ matches }: { matches: BracketMatch[] }) {
 
   return (
     <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <div className="rounded-3xl border border-white/85 bg-white/86 p-4 text-center shadow-lg shadow-sky-100/70 backdrop-blur-xl">
-        <div className="text-2xl font-black text-sky-800 sm:text-3xl">
+      <div className="rounded-3xl border border-white/15 bg-slate-950/50 p-4 text-center shadow-lg shadow-black/30 backdrop-blur-xl">
+        <div className="text-2xl font-black text-white sm:text-3xl">
           {stats.total}
         </div>
-        <div className="mt-1 text-xs font-bold text-slate-500 sm:text-sm">
+        <div className="mt-1 text-xs font-bold text-slate-400 sm:text-sm">
           كل التحديات
         </div>
       </div>
 
-      <div className="rounded-3xl border border-amber-200 bg-amber-50/90 p-4 text-center shadow-lg shadow-amber-100/70 backdrop-blur-xl">
-        <div className="text-2xl font-black text-amber-600 sm:text-3xl">
+      <div className="rounded-3xl border border-amber-400/30 bg-amber-400/10 p-4 text-center shadow-lg shadow-black/25 backdrop-blur-xl">
+        <div className="text-2xl font-black text-amber-200 sm:text-3xl">
           {stats.active}
         </div>
-        <div className="mt-1 text-xs font-bold text-slate-600 sm:text-sm">
+        <div className="mt-1 text-xs font-bold text-slate-300 sm:text-sm">
           قيد التنفيذ
         </div>
       </div>
 
-      <div className="rounded-3xl border border-emerald-200 bg-emerald-50/90 p-4 text-center shadow-lg shadow-emerald-100/70 backdrop-blur-xl">
-        <div className="text-2xl font-black text-emerald-700 sm:text-3xl">
+      <div className="rounded-3xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-center shadow-lg shadow-black/25 backdrop-blur-xl">
+        <div className="text-2xl font-black text-emerald-200 sm:text-3xl">
           {stats.finished}
         </div>
-        <div className="mt-1 text-xs font-bold text-slate-600 sm:text-sm">
+        <div className="mt-1 text-xs font-bold text-slate-300 sm:text-sm">
           منتهية
         </div>
       </div>
 
-      <div className="rounded-3xl border border-sky-200 bg-sky-50/90 p-4 text-center shadow-lg shadow-sky-100/70 backdrop-blur-xl">
-        <div className="text-2xl font-black text-sky-700 sm:text-3xl">
+      <div className="rounded-3xl border border-sky-400/25 bg-sky-400/10 p-4 text-center shadow-lg shadow-black/25 backdrop-blur-xl">
+        <div className="text-2xl font-black text-sky-200 sm:text-3xl">
           {stats.waiting}
         </div>
-        <div className="mt-1 text-xs font-bold text-slate-600 sm:text-sm">
+        <div className="mt-1 text-xs font-bold text-slate-300 sm:text-sm">
           بانتظار الدور
         </div>
       </div>
@@ -304,7 +302,7 @@ export default function BracketPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch("/api/public/bracket")
+    fetch("/api/public/bracket", { cache: "no-store" })
       .then((response) => response.json())
       .then((json) => {
         if (json.data) setMatches(json.data)
@@ -321,20 +319,16 @@ export default function BracketPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden text-slate-900" dir="rtl">
+    <div className="relative min-h-screen overflow-hidden text-white" dir="rtl">
       <PageBackground />
 
       <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-7 md:px-8 md:py-10">
-        <header className="mb-6 rounded-[2rem] border border-white/85 bg-white/86 px-5 py-6 text-center shadow-xl shadow-sky-100/80 backdrop-blur-xl sm:px-8 sm:py-8 md:mb-8">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-3xl bg-amber-100 text-3xl shadow-lg shadow-amber-100 sm:h-16 sm:w-16 sm:text-4xl">
-            🏆
-          </div>
-
-          <h1 className="text-3xl font-black leading-tight text-sky-950 sm:text-4xl md:text-5xl">
+        <header className="mb-6 rounded-[2rem] border border-white/15 bg-slate-950/50 px-5 py-6 text-center shadow-xl shadow-black/30 backdrop-blur-xl sm:px-8 sm:py-8 md:mb-8">
+          <h1 className="text-3xl font-black leading-tight text-white sm:text-4xl md:text-5xl">
             شجرة المنافسة
           </h1>
 
-          <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-relaxed text-slate-500 sm:text-base md:text-lg">
+          <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-relaxed text-slate-300 sm:text-base md:text-lg">
             متابعة مباشرة لمسار التحديات، حالة كل مواجهة، والفريق المتأهل في كل مرحلة.
           </p>
         </header>

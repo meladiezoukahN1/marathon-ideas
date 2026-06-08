@@ -1,7 +1,11 @@
 "use client"
+
 import { useEffect, useState } from "react"
-import { generateVoterToken, hasVotedLocally, markVotedLocally } from "@/lib/fingerprint"
-import { TeamAvatar } from "@/components/common/team-avatar"
+import {
+  generateVoterToken,
+  hasVotedLocally,
+  markVotedLocally,
+} from "@/lib/fingerprint"
 import { getChallengePhaseLabel } from "@/lib/labels"
 
 interface ActiveChallenge {
@@ -12,6 +16,119 @@ interface ActiveChallenge {
   votingSessionId: string | null
   team1: { id: string; name: string; imageUrl: string | null } | null
   team2: { id: string; name: string; imageUrl: string | null } | null
+}
+
+function formatCountdown(seconds: number): string {
+  const m = String(Math.floor(Math.max(0, seconds) / 60)).padStart(2, "0")
+  const s = String(Math.max(0, seconds) % 60).padStart(2, "0")
+  return `${m}:${s}`
+}
+
+function getInitials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+}
+
+function PageBackground() {
+  return (
+    <>
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('/BACKGROUND-01.png')",
+        }}
+      />
+      <div className="absolute inset-0 bg-slate-950/75" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.12),transparent_28%),radial-gradient(circle_at_85%_15%,rgba(14,165,233,0.10),transparent_30%),radial-gradient(circle_at_50%_95%,rgba(16,185,129,0.08),transparent_34%)]" />
+    </>
+  )
+}
+
+function TeamLogoBox({
+  name,
+  imageUrl,
+}: {
+  name: string
+  imageUrl?: string | null
+}) {
+  return (
+    <div className="mx-auto w-fit rounded-[1.35rem] border border-white/15 bg-white/8 p-2.5 shadow-xl shadow-black/35 backdrop-blur-xl">
+      <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-[1.05rem] border border-white/15 bg-white/95 p-2.5 sm:h-24 sm:w-24">
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl}
+            alt={name}
+            className="h-full w-full object-contain"
+            draggable={false}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center rounded-[0.9rem] bg-slate-950 text-2xl font-black text-white sm:text-3xl">
+            {getInitials(name)}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function StatusScreen({
+  title,
+  subtitle,
+  actionLabel,
+  actionHref,
+  tone = "neutral",
+}: {
+  title: string
+  subtitle?: string
+  actionLabel?: string
+  actionHref?: string
+  tone?: "neutral" | "success" | "warning" | "error"
+}) {
+  const toneClass =
+    tone === "success"
+      ? "border-emerald-400/40 bg-emerald-400/15 text-emerald-100"
+      : tone === "warning"
+        ? "border-amber-400/40 bg-amber-400/15 text-amber-100"
+        : tone === "error"
+          ? "border-rose-400/40 bg-rose-500/15 text-rose-100"
+          : "border-white/15 bg-slate-950/65 text-white"
+
+  return (
+    <div className="relative min-h-screen overflow-hidden text-white" dir="rtl">
+      <PageBackground />
+
+      <main className="relative z-10 flex min-h-screen items-center justify-center px-4 py-6">
+        <section
+          className={`w-full max-w-md rounded-[2rem] border px-6 py-8 text-center shadow-2xl shadow-black/40 backdrop-blur-xl ${toneClass}`}
+        >
+          <h1 className="text-2xl font-black leading-tight sm:text-3xl">
+            {title}
+          </h1>
+
+          {subtitle && (
+            <p className="mx-auto mt-3 max-w-sm text-sm font-semibold leading-relaxed text-slate-200 sm:text-base">
+              {subtitle}
+            </p>
+          )}
+
+          {actionHref && actionLabel && (
+            <a
+              href={actionHref}
+              className="mx-auto mt-6 inline-flex rounded-full border border-white/20 bg-white/10 px-5 py-2 text-sm font-black text-white shadow-lg shadow-black/25 transition hover:bg-white/15"
+            >
+              {actionLabel}
+            </a>
+          )}
+        </section>
+      </main>
+    </div>
+  )
 }
 
 export default function VotePage() {
@@ -26,12 +143,13 @@ export default function VotePage() {
   const token = typeof window !== "undefined" ? generateVoterToken() : "tok"
 
   useEffect(() => {
-    fetch("/api/public/active-challenge")
-      .then(r => r.json())
-      .then(j => {
-        if (j.data) {
-          setChallenge(j.data)
-          if (hasVotedLocally(j.data.id, j.data.votingSessionId)) {
+    fetch("/api/public/active-challenge", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((json) => {
+        if (json.data) {
+          setChallenge(json.data)
+
+          if (hasVotedLocally(json.data.id, json.data.votingSessionId)) {
             setAlreadyVoted(true)
           }
         }
@@ -41,24 +159,39 @@ export default function VotePage() {
 
   useEffect(() => {
     if (!challenge?.votingEndsAt) return
-    const iv = setInterval(() => {
-      const remaining = Math.floor((new Date(challenge.votingEndsAt!).getTime() - Date.now()) / 1000)
+
+    const updateCountdown = () => {
+      const remaining = Math.floor(
+        (new Date(challenge.votingEndsAt!).getTime() - Date.now()) / 1000,
+      )
       setCountdown(Math.max(0, remaining))
-    }, 1000)
+    }
+
+    updateCountdown()
+
+    const iv = setInterval(updateCountdown, 1000)
     return () => clearInterval(iv)
   }, [challenge?.votingEndsAt])
 
   async function submitVote() {
-    if (!selected || !challenge) return
+    if (!selected || !challenge || submitting) return
+
     setSubmitting(true)
     setError("")
+
     try {
       const res = await fetch("/api/votes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ challengeId: challenge.id, teamId: selected, voterToken: token }),
+        body: JSON.stringify({
+          challengeId: challenge.id,
+          teamId: selected,
+          voterToken: token,
+        }),
       })
+
       const json = await res.json()
+
       if (json.data?.success) {
         markVotedLocally(challenge.id, challenge.votingSessionId)
         setVoted(true)
@@ -68,150 +201,196 @@ export default function VotePage() {
       } else if (json.error === "VOTING_CLOSED") {
         setError("انتهى وقت التصويت")
       } else {
-        setError(json.error === "VOTING_NOT_OPEN" ? "التصويت غير متاح" : "حدث خطأ، حاول مجدداً")
+        setError(
+          json.error === "VOTING_NOT_OPEN"
+            ? "التصويت غير متاح حالياً"
+            : "حدث خطأ أثناء تسجيل التصويت، حاول مجدداً",
+        )
       }
     } catch {
-      setError("حدث خطأ، حاول مجدداً")
+      setError("تعذر الاتصال بالخادم، حاول مجدداً")
+    } finally {
+      setSubmitting(false)
     }
-    setSubmitting(false)
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4" dir="rtl">
-        <div className="text-xl font-bold text-gray-700">جاري التحميل...</div>
-      </div>
+      <StatusScreen
+        title="جاري تحميل التصويت..."
+        subtitle="يتم تجهيز بيانات المواجهة والفرق"
+      />
     )
   }
 
   if (!challenge) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 gap-4" dir="rtl">
-        <div className="text-5xl">📭</div>
-        <div className="text-xl font-bold text-gray-700">لا يوجد تحدٍ نشط حاليا</div>
-        <p className="text-gray-500 text-center max-w-xs">لم يتم تحديد تحدٍ نشط. يرجى الانتظار حتى يبدأ المسؤول التحدي.</p>
-        <a href="/bracket" className="text-blue-600 underline text-lg">عرض شجرة المنافسة</a>
-      </div>
+      <StatusScreen
+        title="لا يوجد تحدٍ نشط حالياً"
+        subtitle="لم يتم تحديد تحدٍ نشط. يرجى الانتظار حتى يبدأ المسؤول التحدي."
+        actionHref="/bracket"
+        actionLabel="عرض شجرة المنافسة"
+      />
     )
   }
 
   if (challenge.phase === "WAITING") {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 gap-4" dir="rtl">
-        <div className="text-5xl">⏳</div>
-        <div className="text-xl font-bold text-gray-700">{challenge.title}</div>
-        <p className="text-gray-500">التحدي في مرحلة الانتظار. لم يبدأ العرض بعد.</p>
-        <a href="/bracket" className="text-blue-600 underline text-lg">عرض شجرة المنافسة</a>
-      </div>
+      <StatusScreen
+        title={challenge.title}
+        subtitle="التحدي في مرحلة الانتظار. لم يبدأ العرض بعد."
+        actionHref="/bracket"
+        actionLabel="عرض شجرة المنافسة"
+      />
     )
   }
 
   if (challenge.phase === "PRESENTING") {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 gap-4" dir="rtl">
-        <div className="text-5xl">🎤</div>
-        <div className="text-xl font-bold text-gray-700">{challenge.title}</div>
-        <p className="text-gray-500">جاري عرض الفرق. سيتم فتح التصويت بعد انتهاء العرض.</p>
-        <a href="/bracket" className="text-blue-600 underline text-lg">عرض شجرة المنافسة</a>
-      </div>
+      <StatusScreen
+        title={challenge.title}
+        subtitle="جاري عرض الفرق. سيتم فتح التصويت بعد انتهاء العرض."
+        actionHref="/bracket"
+        actionLabel="عرض شجرة المنافسة"
+        tone="warning"
+      />
     )
   }
 
   if (challenge.phase === "RESULT" || challenge.phase === "FINISHED") {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 gap-4" dir="rtl">
-        <div className="text-5xl">🏆</div>
-        <div className="text-xl font-bold text-gray-700">{challenge.title}</div>
-        <p className="text-gray-500">انتهى التصويت وتم الإعلان عن النتيجة.</p>
-        <a href="/bracket" className="text-blue-600 underline text-lg">عرض النتائج الكاملة</a>
-      </div>
+      <StatusScreen
+        title={challenge.title}
+        subtitle="انتهى التصويت وتم الإعلان عن النتيجة."
+        actionHref="/bracket"
+        actionLabel="عرض النتائج الكاملة"
+        tone="success"
+      />
     )
   }
 
   if (challenge.phase !== "VOTING") {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 gap-4" dir="rtl">
-        <div className="text-5xl">🔒</div>
-        <div className="text-xl font-bold text-gray-700">التصويت غير متاح حاليا</div>
-        <p className="text-gray-500">التحدي في مرحلة {getChallengePhaseLabel(challenge.phase)}.</p>
-        <a href="/bracket" className="text-blue-600 underline text-lg">عرض النتائج الكاملة</a>
-      </div>
+      <StatusScreen
+        title="التصويت غير متاح حالياً"
+        subtitle={`التحدي في مرحلة ${getChallengePhaseLabel(challenge.phase)}.`}
+        actionHref="/bracket"
+        actionLabel="عرض النتائج الكاملة"
+        tone="warning"
+      />
     )
   }
 
   if (countdown <= 0 && challenge.votingEndsAt) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 gap-4" dir="rtl">
-        <div className="text-5xl">⏱️</div>
-        <div className="text-xl font-bold text-gray-700">{challenge.title}</div>
-        <p className="text-red-500 font-bold">انتهى وقت التصويت</p>
-        <p className="text-gray-500">لم يعد بإمكانك التصويت في هذا التحدي.</p>
-        <a href="/bracket" className="text-blue-600 underline text-lg">عرض النتائج الكاملة</a>
-      </div>
+      <StatusScreen
+        title={challenge.title}
+        subtitle="انتهى وقت التصويت. لم يعد بإمكانك التصويت في هذا التحدي."
+        actionHref="/bracket"
+        actionLabel="عرض النتائج الكاملة"
+        tone="error"
+      />
     )
   }
 
   if (voted || alreadyVoted) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 gap-4" dir="rtl">
-        <div className="text-5xl">✅</div>
-        <div className="text-xl font-bold text-gray-800">{alreadyVoted ? "لقد قمت بالتصويت سابقا" : "تم تسجيل تصويتك بنجاح"}</div>
-        <a href="/bracket" className="text-blue-600 underline text-lg">عرض النتائج الكاملة</a>
-      </div>
+      <StatusScreen
+        title={
+          alreadyVoted
+            ? "لقد قمت بالتصويت سابقاً"
+            : "تم تسجيل تصويتك بنجاح"
+        }
+        subtitle="شكراً لمشاركتك. يمكنك متابعة النتائج من شاشة المنافسة."
+        actionHref="/bracket"
+        actionLabel="عرض النتائج الكاملة"
+        tone="success"
+      />
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4" dir="rtl">
-      <div className="max-w-md mx-auto space-y-6">
-        <div className="text-center">
-          <div className="text-3xl mb-2">🗳️</div>
-          <h1 className="text-xl font-black text-gray-900">{challenge.title}</h1>
-          <p className="text-gray-500 text-sm mt-1">اختر الفريق الذي تريد التصويت له</p>
-          {countdown > 0 && (
-            <div className="mt-2 text-sm font-mono text-emerald-600 bg-emerald-50 inline-block px-3 py-1 rounded-full">
-              ⏱️ الوقت المتبقي: {String(Math.floor(countdown / 60)).padStart(2, "0")}:{String(countdown % 60).padStart(2, "0")}
-            </div>
-          )}
-          {countdown <= 0 && challenge.votingEndsAt && (
-            <div className="mt-2 text-sm font-mono text-red-600 bg-red-50 inline-block px-3 py-1 rounded-full">
-              ⏱️ انتهى وقت التصويت
-            </div>
-          )}
-        </div>
+    <div className="relative min-h-screen overflow-hidden text-white" dir="rtl">
+      <PageBackground />
 
-        <div className="space-y-4">
-          {[challenge.team1, challenge.team2].map(t => t && (
-            <button
-              key={t.id}
-              onClick={() => setSelected(t.id)}
-              className={`w-full p-5 rounded-2xl border-2 transition-all duration-200 flex flex-col items-center gap-3
-                ${selected === t.id
-                  ? "border-emerald-500 bg-emerald-50 shadow-lg scale-[1.01]"
-                  : "border-gray-200 bg-white hover:border-gray-300"}`}
-            >
-              <TeamAvatar name={t.name} imageUrl={t.imageUrl} size="lg" />
-              <div className="font-bold text-gray-900 text-lg">{t.name}</div>
-              <div className={`w-full py-2 rounded-xl text-sm font-bold transition-colors
-                ${selected === t.id ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-700"}`}>
-                {selected === t.id ? "تم الاختيار" : "التصويت لهذا الفريق"}
+      <main className="relative z-10 flex min-h-screen items-center justify-center px-4 py-6 sm:px-6">
+        <section className="w-full max-w-md rounded-[2rem] border border-white/15 bg-slate-950/65 p-5 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-6">
+          <header className="mb-5 text-center">
+            <div className="mx-auto mb-3 w-fit rounded-full border border-emerald-300/30 bg-emerald-400/15 px-5 py-2 text-sm font-black text-emerald-100 shadow-sm">
+              التصويت مفتوح
+            </div>
+
+            <h1 className="text-2xl font-black leading-tight text-white sm:text-3xl">
+              {challenge.title}
+            </h1>
+
+            <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-300">
+              اختر الفريق الذي تريد التصويت له، ثم اضغط تأكيد التصويت.
+            </p>
+
+            {countdown > 0 && (
+              <div className="mx-auto mt-4 w-fit rounded-full border border-amber-300/35 bg-amber-400/15 px-5 py-2 font-mono text-sm font-black text-amber-100 shadow-lg shadow-black/25">
+                الوقت المتبقي: {formatCountdown(countdown)}
               </div>
-            </button>
-          ))}
-        </div>
+            )}
+          </header>
 
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+          <div className="space-y-4">
+            {[challenge.team1, challenge.team2].map(
+              (team) =>
+                team && (
+                  <button
+                    key={team.id}
+                    type="button"
+                    onClick={() => setSelected(team.id)}
+                    className={`w-full rounded-[1.7rem] border p-4 text-center shadow-xl backdrop-blur-xl transition duration-200 sm:p-5 ${
+                      selected === team.id
+                        ? "scale-[1.01] border-emerald-300/60 bg-emerald-400/20 shadow-emerald-950/30 ring-2 ring-emerald-300/30"
+                        : "border-white/15 bg-white/10 shadow-black/25 hover:border-white/25 hover:bg-white/15"
+                    }`}
+                  >
+                    <TeamLogoBox name={team.name} imageUrl={team.imageUrl} />
 
-        <button
-          onClick={submitVote}
-          disabled={!selected || submitting}
-          className="w-full py-3 rounded-xl bg-emerald-600 text-white text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-emerald-700 transition"
-        >
-          {submitting ? "جاري التسجيل..." : "تأكيد التصويت"}
-        </button>
+                    <div className="mt-4 line-clamp-2 text-xl font-black leading-tight text-white sm:text-2xl">
+                      {team.name}
+                    </div>
 
-        <p className="text-gray-400 text-xs text-center">يمكنك التصويت مرة واحدة فقط</p>
-      </div>
+                    <div
+                      className={`mx-auto mt-4 w-fit rounded-full border px-5 py-2 text-sm font-black transition ${
+                        selected === team.id
+                          ? "border-emerald-300/40 bg-emerald-400/25 text-emerald-100"
+                          : "border-white/15 bg-slate-950/45 text-slate-200"
+                      }`}
+                    >
+                      {selected === team.id
+                        ? "تم اختيار هذا الفريق"
+                        : "التصويت لهذا الفريق"}
+                    </div>
+                  </button>
+                ),
+            )}
+          </div>
+
+          {error && (
+            <p className="mt-4 rounded-2xl border border-rose-400/40 bg-rose-500/15 px-4 py-3 text-center text-sm font-bold text-rose-100">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={submitVote}
+            disabled={!selected || submitting}
+            className="mt-5 w-full rounded-2xl border border-emerald-300/40 bg-emerald-500 px-5 py-3 text-lg font-black text-white shadow-xl shadow-emerald-950/30 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/10 disabled:text-slate-400"
+          >
+            {submitting ? "جاري تسجيل التصويت..." : "تأكيد التصويت"}
+          </button>
+
+          <p className="mt-4 text-center text-xs font-semibold leading-relaxed text-slate-400">
+            يمكنك التصويت مرة واحدة فقط
+          </p>
+        </section>
+      </main>
     </div>
   )
 }
