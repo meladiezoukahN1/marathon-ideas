@@ -5,7 +5,7 @@ import { Providers } from "@/components/shared/Providers"
 import "./globals.css"
 
 const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://marathon-of-ideas.vercel.app";
+  process.env.NEXTAUTH_URL || "https://marathon-ideas.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
