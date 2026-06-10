@@ -4,18 +4,17 @@ generator client {
 
 datasource db {
   provider = "mysql"
-  url      = env("DATABASE_URL")
 }
 
 // ─── Event (top-level container) ─────────────────────────────────────────────
 model Event {
-  id               String      @id @default(cuid())
-  name             String
-  description      String?     @db.Text
-  status           EventStatus @default(UPCOMING)
+  id                String      @id @default(cuid())
+  name              String
+  description       String?     @db.Text
+  status            EventStatus @default(UPCOMING)
   activeChallengeId String?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   challenges Challenge[]
   users      User[]
@@ -27,8 +26,10 @@ model Event {
 model User {
   id        String   @id @default(cuid())
   username  String   @unique
+  name      String?
   password  String
   role      UserRole
+  isActive  Boolean  @default(true)
   eventId   String
   event     Event    @relation(fields: [eventId], references: [id])
   createdAt DateTime @default(now())
@@ -40,48 +41,48 @@ model User {
 
 // ─── Challenge (one competition slot) ────────────────────────────────────────
 model Challenge {
-  id          String          @id @default(cuid())
-  eventId     String
-  event       Event           @relation(fields: [eventId], references: [id])
-  name        String
-  description String?         @db.Text
-  slug        String
-  order       Int
-  status      ChallengeStatus @default(PENDING)
-  phase       ChallengePhase  @default(WAITING)
-  timerSecs   Int             @default(600)
-  timerActive Boolean         @default(false)
-  voteOpenAt           DateTime?
-  voteCloseAt          DateTime?
-  votingStartedAt      DateTime?
-  votingEndsAt         DateTime?
-  votingDurationSeconds Int     @default(120)
-  votingSessionId      String?
-  votingTimerStatus    String   @default("READY")
-  votingTimerPausedAt  DateTime?
-  winnerId             String?
+  id                    String          @id @default(cuid())
+  eventId               String
+  event                 Event           @relation(fields: [eventId], references: [id])
+  name                  String
+  description           String?         @db.Text
+  slug                  String
+  order                 Int
+  status                ChallengeStatus @default(PENDING)
+  phase                 ChallengePhase  @default(WAITING)
+  timerSecs             Int             @default(600)
+  timerActive           Boolean         @default(false)
+  voteOpenAt            DateTime?
+  voteCloseAt           DateTime?
+  votingStartedAt       DateTime?
+  votingEndsAt          DateTime?
+  votingDurationSeconds Int             @default(120)
+  votingSessionId       String?
+  votingTimerStatus     String          @default("READY")
+  votingTimerPausedAt   DateTime?
+  winnerId              String?
 
-  team1FinalScore  Float?
-  team2FinalScore  Float?
-  team1PublicPct   Float?
-  team2PublicPct   Float?
-  team1JuryPct     Float?
-  team2JuryPct     Float?
+  team1FinalScore Float?
+  team2FinalScore Float?
+  team1PublicPct  Float?
+  team2PublicPct  Float?
+  team1JuryPct    Float?
+  team2JuryPct    Float?
 
-  team1TimerDurationSeconds  Int      @default(600)
-  team1TimerRemainingSeconds Int      @default(600)
-  team1TimerStatus           String   @default("READY")
+  team1TimerDurationSeconds  Int       @default(600)
+  team1TimerRemainingSeconds Int       @default(600)
+  team1TimerStatus           String    @default("READY")
   team1TimerStartedAt        DateTime?
   team1TimerPausedAt         DateTime?
 
-  team2TimerDurationSeconds  Int      @default(600)
-  team2TimerRemainingSeconds Int      @default(600)
-  team2TimerStatus           String   @default("READY")
+  team2TimerDurationSeconds  Int       @default(600)
+  team2TimerRemainingSeconds Int       @default(600)
+  team2TimerStatus           String    @default("READY")
   team2TimerStartedAt        DateTime?
   team2TimerPausedAt         DateTime?
 
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   winner      Team?        @relation("ChallengeWinner", fields: [winnerId], references: [id])
   teams       Team[]
@@ -115,14 +116,14 @@ model Team {
 
 // ─── PublicVote ───────────────────────────────────────────────────────────────
 model PublicVote {
-  id               String    @id @default(cuid())
-  challengeId      String
-  challenge        Challenge @relation(fields: [challengeId], references: [id])
-  teamId           String
-  team             Team      @relation(fields: [teamId], references: [id])
-  voterToken       String
-  votingSessionId  String    @default("legacy")
-  createdAt        DateTime  @default(now())
+  id              String    @id @default(cuid())
+  challengeId     String
+  challenge       Challenge @relation(fields: [challengeId], references: [id])
+  teamId          String
+  team            Team      @relation(fields: [teamId], references: [id])
+  voterToken      String
+  votingSessionId String    @default("legacy")
+  createdAt       DateTime  @default(now())
 
   @@unique([challengeId, votingSessionId, voterToken])
   @@index([challengeId, teamId])
@@ -130,15 +131,15 @@ model PublicVote {
 
 // ─── JuryVote ────────────────────────────────────────────────────────────────
 model JuryVote {
-  id               String    @id @default(cuid())
-  challengeId      String
-  challenge        Challenge @relation(fields: [challengeId], references: [id])
-  teamId           String
-  team             Team      @relation(fields: [teamId], references: [id])
-  jurorId          String
-  juror            User      @relation(fields: [jurorId], references: [id])
-  votingSessionId  String    @default("legacy")
-  createdAt        DateTime  @default(now())
+  id              String    @id @default(cuid())
+  challengeId     String
+  challenge       Challenge @relation(fields: [challengeId], references: [id])
+  teamId          String
+  team            Team      @relation(fields: [teamId], references: [id])
+  jurorId         String
+  juror           User      @relation(fields: [jurorId], references: [id])
+  votingSessionId String    @default("legacy")
+  createdAt       DateTime  @default(now())
 
   @@unique([challengeId, votingSessionId, jurorId])
   @@index([challengeId])

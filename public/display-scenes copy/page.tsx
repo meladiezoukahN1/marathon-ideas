@@ -45,13 +45,11 @@ const pageShellClass =
 
 type DisplaySceneKey =
   | "OPENING"
-  | "OPENING_INTRO"
   | "MATCH_CARD"
   | "TEAM_PRESENTATION"
   | "VOTING"
   | "RESULT_WAITING"
   | "RESULT_REVEAL"
-  | "ROUND_TRANSITION"
   | "CLOSING"
   | "DEFAULT"
 
@@ -62,10 +60,6 @@ const DISPLAY_SCENE_CONFIG: Record<
   OPENING: {
     image: "/display-scenes/opening.jpg",
     overlayClassName: "bg-slate-950/45",
-  },
-  OPENING_INTRO: {
-    image: "/display-scenes/opening-intro.jpg",
-    overlayClassName: "bg-slate-950/0",
   },
   MATCH_CARD: {
     image: "/display-scenes/match-card-bioroots-purecore.jpg",
@@ -80,20 +74,16 @@ const DISPLAY_SCENE_CONFIG: Record<
     overlayClassName: "bg-slate-950/45",
   },
   RESULT_WAITING: {
-  image: "/display-scenes/result-waiting.jpg",
-  overlayClassName: "bg-slate-950/0",
-},
+    image: "/display-scenes/transition-next-round.jpg",
+    overlayClassName: "bg-slate-950/50",
+  },
   RESULT_REVEAL: {
     image: "/display-scenes/arena-innovation-16x9.jpg",
     overlayClassName: "bg-slate-950/40",
   },
   CLOSING: {
-    image: "/display-scenes/final-closing.jpg",
-    overlayClassName: "bg-slate-950/0",
-  },
-  ROUND_TRANSITION: {
-    image: "/display-scenes/round-transition-next.jpg",
-    overlayClassName: "bg-slate-950/0",
+    image: "/display-scenes/closing.jpg",
+    overlayClassName: "bg-slate-950/45",
   },
   DEFAULT: {
     image: "/BACKGROUND-01.png",
@@ -140,33 +130,22 @@ function getDisplaySceneKey(
 
 function BackgroundLayer({ sceneKey }: { sceneKey: DisplaySceneKey }) {
   const scene = DISPLAY_SCENE_CONFIG[sceneKey] ?? DISPLAY_SCENE_CONFIG.DEFAULT
-
   const isMatchCard = sceneKey === "MATCH_CARD"
   const isPresentation = sceneKey === "TEAM_PRESENTATION"
-  const isOpeningIntro = sceneKey === "OPENING_INTRO"
-  const isResultWaiting = sceneKey === "RESULT_WAITING"
-  const isRoundTransition = sceneKey === "ROUND_TRANSITION"
-  const isClosing = sceneKey === "CLOSING"
-
-  const backgroundSizeClass = isOpeningIntro || isResultWaiting || isRoundTransition || isClosing
-    ? "bg-[length:100%_100%]"
-    : isMatchCard || isPresentation
-      ? "bg-contain"
-      : "bg-cover"
-
-  const shouldHideGradients =
-    isOpeningIntro || isMatchCard || isPresentation || isResultWaiting || isRoundTransition || isClosing
+  const shouldContainImage = isMatchCard || isPresentation
 
   return (
     <>
       <div
-        className={`absolute inset-0 bg-center bg-no-repeat ${backgroundSizeClass}`}
+        className={`absolute inset-0 bg-center bg-no-repeat ${
+          shouldContainImage ? "bg-contain" : "bg-cover"
+        }`}
         style={{ backgroundImage: `url('${scene.image}')` }}
       />
 
       <div className={`absolute inset-0 ${scene.overlayClassName}`} />
 
-      {!shouldHideGradients && (
+      {!isMatchCard && !isPresentation && (
         <>
           <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/35 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/35 to-transparent" />
@@ -193,7 +172,7 @@ type PresentationViewMode =
 function StatusScreen({
   title,
   tone = "neutral",
-  sceneKey = "DEFAULT",
+  sceneKey = "OPENING",
 }: {
   title: string
   tone?: "neutral" | "error"
@@ -366,13 +345,24 @@ function TeamIntroCard({
 
 function TeamsTogetherView({
   match,
+  title,
 }: {
   match: PublicActiveMatch
-  title?: string
-  description?: string
+  title: string
+  description: string
 }) {
   return (
     <main className="relative z-10 flex flex-1 flex-col items-center justify-center gap-8 px-4 py-5 sm:gap-10 sm:px-6 sm:py-7 md:gap-16 md:py-8">
+      <section className="w-full max-w-3xl rounded-[2rem] border border-white/15 bg-slate-950/60 px-6 py-6 text-center shadow-xl shadow-black/30 backdrop-blur-xl sm:px-8 sm:py-7">
+        <h2 className="text-3xl font-black leading-tight text-white sm:text-4xl md:text-5xl">
+          {title}
+        </h2>
+
+        <p className="mx-auto mt-4 max-w-2xl text-base font-semibold leading-relaxed text-slate-300 sm:text-lg">
+          {/* {description} */}
+        </p>
+      </section>
+
       <div className="grid w-full max-w-6xl grid-cols-1 items-center gap-5 sm:gap-6 md:grid-cols-[1fr_auto_1fr] md:gap-8">
         <TeamIntroCard
           label={match.team1?.name ?? "الفريق الأول"}
@@ -812,43 +802,10 @@ function ResultTeamCard({
   )
 }
 
-function ResultWaitingPhase({ match }: { match: PublicActiveMatch }) {
-  const trackName = formatTrackName(match.name)
-
-  return (
-    <main className="relative z-10 flex flex-1 items-center justify-center">
-      <div className="absolute bottom-[8%] left-1/2 -translate-x-1/2">
-        <h2 className="text-center text-2xl font-black text-white/70 drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] sm:text-3xl md:text-4xl">
-          {trackName}
-        </h2>
-      </div>
-    </main>
-  )
-}
-
-function RoundTransitionPhase() {
-  return (
-    <main className="pointer-events-none relative z-10 min-h-screen flex-1 overflow-hidden" />
-  )
-}
-
-function ClosingPhase() {
-  return (
-    <main className="pointer-events-none relative z-10 min-h-screen flex-1 overflow-hidden" />
-  )
-}
-
-function OpeningIntroPhase() {
-  return (
-    <main className="pointer-events-none relative z-10 min-h-screen flex-1 overflow-hidden" />
-  )
-}
-
 export default function DisplayPage() {
   const [match, setMatch] = useState<PublicActiveMatch | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [displayState, setDisplayState] = useState<"MATCH" | "OPENING_INTRO" | "ROUND_TRANSITION" | "CLOSING">("OPENING_INTRO")
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchMatch = useCallback(async () => {
@@ -864,9 +821,6 @@ export default function DisplayPage() {
           setError(json.error)
         }
       } else {
-        if (json.displayState) {
-          setDisplayState(json.displayState)
-        }
         setMatch(json.data)
         setError(null)
       }
@@ -891,73 +845,60 @@ export default function DisplayPage() {
     }
   }, [fetchMatch])
 
- const presentationMode =
-  match?.phase === "PRESENTING" && match ? getPresentationViewMode(match) : null
-const sceneKey = match ? getDisplaySceneKey(match, presentationMode) : "OPENING"
+  const presentationMode =
+    match?.phase === "PRESENTING" && match ? getPresentationViewMode(match) : null
+  const sceneKey = match ? getDisplaySceneKey(match, presentationMode) : "OPENING"
 const isMatchCardScene = sceneKey === "MATCH_CARD"
+const isPresentationScene = sceneKey === "TEAM_PRESENTATION"
+const shouldHideHeader = isMatchCardScene || isPresentationScene
+  if (loading) {
+    return <StatusScreen title="جاري تجهيز شاشة العرض..." />
+  }
 
-if (loading) {
-  return <StatusScreen title="جاري تجهيز شاشة العرض..." />
-}
-
-if (error) {
-  return (
-    <StatusScreen title={`تعذر تحميل بيانات العرض: ${error}`} tone="error" />
-  )
-}
-
-if (!match) {
-  if (displayState === "CLOSING") {
+  if (error) {
     return (
-      <div className={pageShellClass} dir="rtl">
-        <BackgroundLayer sceneKey="CLOSING" />
-        <ClosingPhase />
-      </div>
+      <StatusScreen title={`تعذر تحميل بيانات العرض: ${error}`} tone="error" />
     )
   }
 
-  if (displayState === "ROUND_TRANSITION") {
-    return (
-      <div className={pageShellClass} dir="rtl">
-        <BackgroundLayer sceneKey="ROUND_TRANSITION" />
-        <RoundTransitionPhase />
-      </div>
-    )
+  if (!match) {
+    return <StatusScreen title="في انتظار الجولة القادمة" />
   }
 
   return (
     <div className={pageShellClass} dir="rtl">
-      <BackgroundLayer sceneKey="OPENING_INTRO" />
-      <OpeningIntroPhase />
+      <BackgroundLayer sceneKey={sceneKey} />
+
+      {!shouldHideHeader && (
+        <header className="relative z-10 mx-3 mt-3 flex items-center justify-between gap-3 rounded-[1.7rem] border border-white/15 bg-slate-950/60 px-4 py-4 shadow-xl shadow-black/30 backdrop-blur-xl sm:mx-5 sm:mt-5 sm:px-6 md:mx-8 md:mt-6 md:py-5">
+          <h1 className="min-w-0 truncate text-lg font-black text-white sm:text-2xl md:text-3xl lg:text-4xl">
+            {match.name}
+          </h1>
+
+          <a
+            href="/bracket"
+            className="shrink-0 rounded-full border border-amber-400/50 bg-amber-400/20 px-4 py-2 text-xs font-black text-amber-100 shadow-md shadow-black/25 transition duration-300 hover:bg-amber-400/30 sm:px-5 sm:text-sm md:text-base"
+          >
+            شجرة المنافسة
+          </a>
+        </header>
+      )}
+
+      {isMatchCardScene ? (
+        <MatchCardScene match={match} />
+      ) : match.phase === "PRESENTING" ? (
+        <PresentationPhase match={match} />
+      ) : match.phase === "VOTING" ? (
+        <VotingPhase match={match} />
+      ) : match.phase === "RESULT" || match.phase === "FINISHED" ? (
+        <ResultPhase match={match} />
+      ) : (
+        <main className="relative z-10 flex flex-1 items-center justify-center px-4 sm:px-6">
+          <div className="rounded-[1.7rem] border border-white/15 bg-slate-950/60 px-6 py-6 text-center text-3xl font-black text-white shadow-xl shadow-black/30 backdrop-blur-xl sm:px-10 sm:py-8 sm:text-4xl md:text-5xl">
+            في انتظار بدء التحدي
+          </div>
+        </main>
+      )}
     </div>
   )
-}
-
-return (
-  <div className={pageShellClass} dir="rtl">
-    <BackgroundLayer sceneKey={sceneKey} />
-
-    {isMatchCardScene ? (
-      <MatchCardScene match={match} />
-    ) : sceneKey === "RESULT_WAITING" ? (
-      <ResultWaitingPhase match={match} />
-    ) : sceneKey === "ROUND_TRANSITION" ? (
-      <RoundTransitionPhase />
-    ) : match.phase === "PRESENTING" ? (
-      <PresentationPhase match={match} />
-    ) : match.phase === "VOTING" ? (
-      <VotingPhase match={match} />
-    ) : match.phase === "RESULT" ? (
-      <ResultPhase match={match} />
-    ) : match.phase === "FINISHED" ? (
-      <ClosingPhase />
-    ) : (
-      <main className="relative z-10 flex flex-1 items-center justify-center px-4 sm:px-6">
-        <div className="rounded-[1.7rem] border border-white/15 bg-slate-950/60 px-6 py-6 text-center text-3xl font-black text-white shadow-xl shadow-black/30 backdrop-blur-xl sm:px-10 sm:py-8 sm:text-4xl md:text-5xl">
-          في انتظار بدء التحدي
-        </div>
-      </main>
-    )}
-  </div>
-)
 }

@@ -69,7 +69,9 @@ export interface EventPublic {
 export interface UserPublic {
   id: string
   username: string
+  name: string | null
   role: UserRole
+  isActive: boolean
   createdAt: string
 }
 

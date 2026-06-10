@@ -31,7 +31,23 @@ export async function GET() {
     }
 
     if (!match) {
-      return NextResponse.json<ApiResponse<null>>({ data: null, error: "NO_ACTIVE_MATCH" }, { status: 404 })
+      const totalChallenges = await prisma.challenge.count({
+        where: { eventId: EVENT_ID },
+      })
+      const finishedCount = await prisma.challenge.count({
+        where: { eventId: EVENT_ID, phase: "FINISHED" },
+      })
+
+      let displayState: string
+      if (totalChallenges === 0 || finishedCount === 0) {
+        displayState = "OPENING_INTRO"
+      } else if (finishedCount < totalChallenges) {
+        displayState = "ROUND_TRANSITION"
+      } else {
+        displayState = "CLOSING"
+      }
+
+      return NextResponse.json({ data: null, error: null, displayState })
     }
 
     // Auto-finalize expired voting before returning data

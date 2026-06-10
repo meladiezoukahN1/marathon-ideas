@@ -24,6 +24,7 @@ async function main() {
     update: {},
     create: {
       username: "superadmin",
+      name: "المدير الرئيسي",
       password: await bcrypt.hash("Super@2025", 12),
       role: "SUPERADMIN",
       eventId: event.id,
@@ -36,6 +37,7 @@ async function main() {
     update: {},
     create: {
       username: "admin",
+      name: "مدير النظام",
       password: await bcrypt.hash("Admin@2025", 12),
       role: "ADMIN",
       eventId: event.id,
@@ -49,6 +51,7 @@ async function main() {
       update: {},
       create: {
         username: `jury${i}`,
+        name: `محكم ${i}`,
         password: await bcrypt.hash(`Jury${i}@2025`, 12),
         role: "JURY",
         eventId: event.id,
@@ -152,9 +155,7 @@ async function main() {
 
   console.log("✅ Seed complete!");
   console.log("─".repeat(40));
-  console.log("superadmin / Super@2025");
-  console.log("admin      / Admin@2025");
-  console.log("jury1..5   / Jury1@2025 .. Jury5@2025");
+  console.log("superadmin, admin, and jury users seeded");
 }
 
 main()
