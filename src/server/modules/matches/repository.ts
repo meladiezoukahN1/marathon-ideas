@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import type { TimerStatus, TeamSlot } from "./types"
+import type { TimerStatus, TeamSlot, AdminMatchListItem } from "./types"
 
 const TIMER_FIELDS = {
   team1TimerDurationSeconds: true,
@@ -220,7 +220,7 @@ export async function getMatchVoteAudit(
   }
 }
 
-export async function getMatchesForAdmin(eventId: string) {
+export async function getMatchesForAdmin(eventId: string): Promise<AdminMatchListItem[]> {
   const rows = await prisma.challenge.findMany({
     where: { eventId },
     orderBy: { order: "asc" },
@@ -239,6 +239,7 @@ export async function getMatchesForAdmin(eventId: string) {
     votingStartedAt: r.votingStartedAt?.toISOString() ?? null,
     votingEndsAt: r.votingEndsAt?.toISOString() ?? null,
     votingDurationSeconds: r.votingDurationSeconds,
+    votingSessionId: r.votingSessionId,
     votingTimerStatus: r.votingTimerStatus,
     votingTimerPausedAt: r.votingTimerPausedAt?.toISOString() ?? null,
     team1FinalScore: r.team1FinalScore,
