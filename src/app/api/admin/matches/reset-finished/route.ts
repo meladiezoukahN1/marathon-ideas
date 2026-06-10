@@ -9,7 +9,11 @@ export async function POST() {
     const user = await getCurrentUser()
     assertIsAdmin(user)
 
-    const finished = await prisma.challenge.findMany({
+    const finished: {
+      id: string
+      team1TimerDurationSeconds: number
+      team2TimerDurationSeconds: number
+    }[] = await prisma.challenge.findMany({
       where: { phase: { in: ["RESULT", "FINISHED"] } },
       select: {
         id: true,
