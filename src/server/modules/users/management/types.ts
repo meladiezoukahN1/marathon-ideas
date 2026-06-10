@@ -8,9 +8,7 @@ export interface CurrentUser {
 export interface ManagedUser {
   id: string
   username: string
-  name: string | null
   role: UserRole
-  isActive: boolean
   createdAt: string
 }
 

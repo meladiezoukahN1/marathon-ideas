@@ -25,9 +25,7 @@ describe("user management repository", () => {
       {
         id: "user-1",
         username: "admin",
-        name: "مدير النظام",
         role: "ADMIN",
-        isActive: true,
         createdAt: new Date("2026-06-09T00:00:00.000Z"),
       } as any,
     ] as any)
@@ -40,9 +38,7 @@ describe("user management repository", () => {
       select: expect.objectContaining({
         id: true,
         username: true,
-        name: true,
         role: true,
-        isActive: true,
         createdAt: true,
       }),
     }))
@@ -53,18 +49,14 @@ describe("user management repository", () => {
     mockedPrisma.user.create.mockResolvedValue({
       id: "user-2",
       username: "jury6",
-      name: "محكم 6",
       role: "JURY",
-      isActive: true,
       createdAt: new Date("2026-06-09T00:00:00.000Z"),
     } as any)
 
     const result = await createUser("event-001", {
       username: "jury6",
-      name: "محكم 6",
       role: "JURY",
       passwordHash: "hashed",
-      isActive: true,
     })
 
     expect(mockedPrisma.user.create).toHaveBeenCalledWith(expect.objectContaining({
@@ -74,9 +66,7 @@ describe("user management repository", () => {
       select: expect.objectContaining({
         id: true,
         username: true,
-        name: true,
         role: true,
-        isActive: true,
         createdAt: true,
       }),
     }))
@@ -87,25 +77,21 @@ describe("user management repository", () => {
     mockedPrisma.user.update.mockResolvedValue({
       id: "user-3",
       username: "jury3",
-      name: "اسم جديد",
       role: "JURY",
-      isActive: true,
       eventId: "event-001",
       createdAt: new Date("2026-06-09T00:00:00.000Z"),
     } as any)
 
-    const result = await updateUser("event-001", "user-3", { name: "اسم جديد" })
+    const result = await updateUser("event-001", "user-3", { username: "jury3-new" })
 
     expect(mockedPrisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
-        name: "اسم جديد",
+        username: "jury3-new",
       }),
       select: expect.objectContaining({
         id: true,
         username: true,
-        name: true,
         role: true,
-        isActive: true,
         eventId: true,
         createdAt: true,
       }),

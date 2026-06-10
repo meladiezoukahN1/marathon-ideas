@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { disableAdminUser, patchAdminUser } from "@/server/modules/users/management/service"
+import { patchAdminUser } from "@/server/modules/users/management/service"
 import { updateUserSchema } from "@/server/modules/users/management/validator"
 import { ConflictError, ForbiddenError, NotFoundError } from "@/server/modules/users/management/policy"
 import type { CurrentUser } from "@/server/modules/users/management/types"
@@ -47,16 +47,3 @@ export async function PATCH(request: NextRequest, { params }: { params: { userId
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: { userId: string } }) {
-  try {
-    const currentUser = await getCurrentUser()
-    if (!currentUser) {
-      return NextResponse.json({ data: null, error: "UNAUTHORIZED" }, { status: 401 })
-    }
-
-    const result = await disableAdminUser(currentUser, params.userId)
-    return NextResponse.json({ data: result, error: null })
-  } catch (error) {
-    return mapError(error)
-  }
-}

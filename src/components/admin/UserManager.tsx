@@ -22,28 +22,20 @@ type UsersResponse = {
 
 type UserFormState = {
   username: string
-  name: string
   password: string
   role: UserRole
-  isActive: boolean
 }
 
 const EMPTY_FORM: UserFormState = {
   username: "",
-  name: "",
   password: "",
   role: "JURY",
-  isActive: true,
 }
 
 function roleBadge(role: UserRole) {
   if (role === "SUPERADMIN") return <Badge label="SUPERADMIN" variant="warning" />
   if (role === "ADMIN") return <Badge label="ADMIN" variant="info" />
   return <Badge label="JURY" variant="neutral" />
-}
-
-function statusBadge(isActive: boolean) {
-  return isActive ? <Badge label="مفعل" variant="success" /> : <Badge label="معطل" variant="danger" />
 }
 
 export function UserManager() {
@@ -113,10 +105,8 @@ export function UserManager() {
     setEditingUser(user)
     setForm({
       username: user.username,
-      name: user.name ?? "",
       password: "",
       role: user.role,
-      isActive: user.isActive,
     })
     setModalOpen(true)
   }
@@ -137,12 +127,12 @@ export function UserManager() {
     event.preventDefault()
     setSaving(true)
 
-    const body = {
+    const body: Record<string, unknown> = {
       username: form.username.trim(),
-      name: form.name.trim() || null,
       role: form.role,
-      isActive: form.isActive,
-      ...(form.password.trim() ? { password: form.password.trim() } : {}),
+    }
+    if (form.password.trim()) {
+      body.password = form.password.trim()
     }
 
     try {
@@ -160,7 +150,7 @@ export function UserManager() {
           return
         }
         if (json.error === "LAST_SUPERADMIN") {
-          toast.error("لا يمكن تعطيل آخر مدير رئيسي")
+          toast.error("لا يمكن تغيير دور آخر مدير رئيسي")
           return
         }
         throw new Error(json.error ?? "فشل حفظ المستخدم")
@@ -175,36 +165,6 @@ export function UserManager() {
       toast.error(error instanceof Error ? error.message : "فشل حفظ المستخدم")
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function toggleActive(user: UserPublic) {
-    const nextActive = !user.isActive
-    if (!nextActive && !confirm(`هل تريد تعطيل المستخدم ${user.username}؟`)) {
-      return
-    }
-
-    try {
-      const response = await fetch(`/api/admin/users/${user.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: nextActive }),
-      })
-
-      const json = await response.json()
-
-      if (!response.ok) {
-        if (json.error === "LAST_SUPERADMIN") {
-          toast.error("لا يمكن تعطيل آخر مدير رئيسي")
-          return
-        }
-        throw new Error(json.error ?? "فشل تحديث المستخدم")
-      }
-
-      toast.success(nextActive ? "تم تفعيل المستخدم" : "تم تعطيل المستخدم")
-      setUsers((previous) => previous.map((item) => (item.id === user.id ? json.data : item)))
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "فشل تحديث المستخدم")
     }
   }
 
@@ -224,7 +184,7 @@ export function UserManager() {
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-sky-600">إدارة المستخدمين</p>
             <h1 className="mt-2 text-3xl font-black text-slate-950">المستخدمون والصلاحيات</h1>
             <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-500">
-              إنشاء المستخدمين، تعديل بياناتهم، وتعطيل الحسابات مباشرة من لوحة التحكم.
+              إنشاء المستخدمين وتعديل بياناتهم مباشرة من لوحة التحكم.
             </p>
           </div>
 
@@ -232,7 +192,7 @@ export function UserManager() {
             <Input
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="ابحث باسم المستخدم أو الاسم الظاهر"
+              placeholder="ابحث باسم المستخدم"
               className="sm:w-80"
             />
             <Button onClick={openCreateModal}>إضافة مستخدم</Button>
@@ -245,41 +205,30 @@ export function UserManager() {
           <table className="min-w-full divide-y divide-slate-200 text-right">
             <thead className="bg-slate-50">
               <tr className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                <th className="px-4 py-4">الاسم</th>
                 <th className="px-4 py-4">اسم المستخدم</th>
                 <th className="px-4 py-4">الدور</th>
-                <th className="px-4 py-4">الحالة</th>
                 <th className="px-4 py-4">الإجراءات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td className="px-4 py-10 text-center text-slate-500" colSpan={5}>جاري تحميل المستخدمين...</td>
+                  <td className="px-4 py-10 text-center text-slate-500" colSpan={3}>جاري تحميل المستخدمين...</td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-10 text-center text-slate-500" colSpan={5}>لا توجد نتائج مطابقة</td>
+                  <td className="px-4 py-10 text-center text-slate-500" colSpan={3}>لا توجد نتائج مطابقة</td>
                 </tr>
               ) : users.map((user) => (
-                <tr key={user.id} className={user.isActive ? "hover:bg-slate-50" : "bg-slate-50/60 text-slate-400"}>
+                <tr key={user.id} className="hover:bg-slate-50">
                   <td className="px-4 py-4">
-                    <div className="font-bold text-slate-900">{user.name ?? "—"}</div>
+                    <div className="font-bold text-slate-900">{user.username}</div>
                     <div className="text-xs text-slate-500">{user.createdAt}</div>
                   </td>
-                  <td className="px-4 py-4 font-medium text-slate-700">{user.username}</td>
                   <td className="px-4 py-4">{roleBadge(user.role)}</td>
-                  <td className="px-4 py-4">{statusBadge(user.isActive)}</td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" variant="secondary" onClick={() => openEditModal(user)}>تعديل</Button>
-                      <Button
-                        size="sm"
-                        variant={user.isActive ? "danger" : "success"}
-                        onClick={() => toggleActive(user)}
-                      >
-                        {user.isActive ? "تعطيل" : "تفعيل"}
-                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -329,13 +278,6 @@ export function UserManager() {
             required
           />
 
-          <Input
-            label="الاسم الظاهر"
-            value={form.name}
-            onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))}
-            placeholder="اختياري"
-          />
-
           <div>
             <label htmlFor="user-role" className="mb-1 block text-sm font-medium text-gray-700">الدور</label>
             <select
@@ -361,15 +303,6 @@ export function UserManager() {
           />
 
           {editingUser && <p className="text-xs text-slate-500">اتركه فارغاً إذا لا تريد تغيير كلمة المرور</p>}
-
-          <label className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(event) => setForm((previous) => ({ ...previous, isActive: event.target.checked }))}
-            />
-            المستخدم مفعل
-          </label>
 
           <div className="flex items-center justify-end gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>إلغاء</Button>
